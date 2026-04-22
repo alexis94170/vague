@@ -120,7 +120,7 @@ export default function TaskList({ view, onOpenTask }: Props) {
   const isEmpty = groups.length === 0 || groups.every((g) => g.tasks.length === 0);
 
   return (
-    <div className="relative overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg-elev)]">
+    <div className="relative overflow-hidden bg-[var(--bg-elev)] sm:rounded-xl sm:border sm:border-[var(--border)]">
       {hasSelection && (
         <div className="sticky top-[84px] z-10 flex flex-wrap items-center gap-2 border-b border-[var(--border)] bg-[var(--bg-elev)]/95 px-4 py-2.5 text-[12px] backdrop-blur">
           <span className="font-medium text-[var(--text)]">
@@ -180,11 +180,11 @@ export default function TaskList({ view, onOpenTask }: Props) {
           {groups.map((g, i) => (
             <section key={i} className="anim-fade-in">
               {g.label && (
-                <header className="flex items-center justify-between bg-[var(--bg)]/50 px-4 py-2">
-                  <h3 className={`text-[10.5px] font-semibold uppercase tracking-wider ${g.tone ?? "text-[var(--text-muted)]"}`}>
+                <header className="flex items-center justify-between bg-[var(--bg)]/60 px-4 py-2.5 pt-4">
+                  <h3 className={`text-[11px] font-semibold uppercase tracking-wider ${g.tone ?? "text-[var(--text-muted)]"}`}>
                     {g.label}
                   </h3>
-                  <span className="text-[10.5px] tabular-nums text-[var(--text-subtle)]">{g.tasks.length}</span>
+                  <span className="rounded-full bg-[var(--bg-hover)] px-2 py-0.5 text-[10.5px] font-semibold tabular-nums text-[var(--text-muted)]">{g.tasks.length}</span>
                 </header>
               )}
               <div className="divide-y divide-[var(--border)]/50">

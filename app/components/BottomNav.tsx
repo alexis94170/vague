@@ -15,7 +15,7 @@ type Props = {
 type Item = { kind: ViewKind["kind"]; label: string; icon: IconName };
 
 const ITEMS: Item[] = [
-  { kind: "today", label: "Aujourd'hui", icon: "sun" },
+  { kind: "today", label: "Jour", icon: "sun" },
   { kind: "untriaged", label: "À trier", icon: "inbox" },
   { kind: "all", label: "Toutes", icon: "list" },
   { kind: "waiting", label: "Attente", icon: "pause" },
@@ -42,8 +42,8 @@ export default function BottomNav({ view, onViewChange, onOpenMore }: Props) {
   }
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--border)] bg-[var(--bg-elev)]/95 backdrop-blur-lg safe-bottom md:hidden">
-      <div className="flex h-16 items-stretch">
+    <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--border)] glass-bottom safe-bottom md:hidden">
+      <div className="flex h-[58px] items-stretch px-1">
         {ITEMS.map((item) => {
           const active = isActive(item.kind);
           const count =
@@ -55,27 +55,36 @@ export default function BottomNav({ view, onViewChange, onOpenMore }: Props) {
             <button
               key={item.kind}
               onClick={() => onViewChange({ kind: item.kind } as ViewKind)}
-              className={`relative flex flex-1 flex-col items-center justify-center gap-0.5 transition ${
+              className={`no-select tappable relative flex flex-1 flex-col items-center justify-center gap-0.5 rounded-xl transition active:scale-95 ${
                 active ? "text-[var(--accent)]" : "text-[var(--text-muted)]"
               }`}
             >
-              <div className="relative">
-                <Icon name={item.icon} size={22} />
-                {count > 0 && !active && (
-                  <span className="absolute -right-2 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--accent)] px-1 text-[9px] font-semibold text-white">
-                    {count > 99 ? "99+" : count}
-                  </span>
+              <div className="relative flex h-7 items-center justify-center">
+                {active && (
+                  <span className="absolute inset-x-1 inset-y-0 rounded-full bg-[var(--accent-soft)]" aria-hidden />
                 )}
+                <span className="relative">
+                  <Icon name={item.icon} size={22} />
+                  {count > 0 && (
+                    <span className={`absolute -right-2.5 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[9px] font-bold tabular-nums ${
+                      active ? "bg-[var(--accent)] text-white" : "bg-rose-500 text-white"
+                    }`}>
+                      {count > 99 ? "99+" : count}
+                    </span>
+                  )}
+                </span>
               </div>
-              <span className="text-[10px] font-medium">{item.label}</span>
+              <span className={`text-[10px] font-medium ${active ? "font-semibold" : ""}`}>{item.label}</span>
             </button>
           );
         })}
         <button
           onClick={onOpenMore}
-          className="flex flex-1 flex-col items-center justify-center gap-0.5 text-[var(--text-muted)] transition"
+          className="no-select tappable flex flex-1 flex-col items-center justify-center gap-0.5 rounded-xl text-[var(--text-muted)] transition active:scale-95"
         >
-          <Icon name="menu" size={22} />
+          <div className="flex h-7 items-center justify-center">
+            <Icon name="menu" size={22} />
+          </div>
           <span className="text-[10px] font-medium">Menu</span>
         </button>
       </div>

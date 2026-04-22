@@ -130,33 +130,33 @@ export default function Home() {
         </header>
 
         {/* Mobile header: large title iOS-style */}
-        <header className="sticky top-0 z-20 border-b border-[var(--border)] bg-[var(--bg)]/95 backdrop-blur-lg safe-top md:hidden">
-          <div className="flex items-center justify-between px-4 pb-2 pt-3">
+        <header className="glass sticky top-0 z-20 border-b border-[var(--border)] pt-safe md:hidden">
+          <div className="flex items-center justify-between px-4 pb-1 pt-1">
             <button
               onClick={() => setPaletteOpen(true)}
-              className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"
+              className="tappable no-select flex items-center justify-center rounded-full text-[var(--text-muted)] active:bg-[var(--bg-hover)]"
               aria-label="Rechercher"
             >
-              <Icon name="search" size={18} />
+              <Icon name="search" size={20} />
             </button>
             {view.kind === "today" && (
               <button
                 onClick={() => setTodayPickerOpen(true)}
-                className="flex items-center gap-1.5 rounded-full bg-[var(--bg-hover)] px-3 py-1.5 text-[11.5px] font-medium text-[var(--text-muted)]"
+                className="no-select flex items-center gap-1.5 rounded-full bg-[var(--bg-hover)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-muted)] active:scale-95"
               >
-                <Icon name="plus" size={12} />
+                <Icon name="plus" size={13} />
                 Ajouter
               </button>
             )}
           </div>
-          <div className="px-4 pb-3">
-            <div className="flex items-center gap-2">
+          <div className="px-4 pb-3 pt-1">
+            <div className="flex items-center gap-2.5">
               {project && (
                 <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: project.color }} />
               )}
-              <h2 className="truncate text-[26px] font-bold tracking-tight">{title}</h2>
+              <h2 className="truncate text-[28px] font-bold leading-tight tracking-tight">{title}</h2>
             </div>
-            <div className="mt-0.5 text-[12.5px] text-[var(--text-muted)]">{subtitle}</div>
+            <div className="mt-1 text-[13px] text-[var(--text-muted)]">{subtitle}</div>
           </div>
         </header>
 
@@ -173,11 +173,14 @@ export default function Home() {
       {/* Mobile FAB */}
       <button
         onClick={() => setMobileAddOpen(true)}
-        className="fixed bottom-20 right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-[var(--accent)] text-white shadow-lg shadow-indigo-500/30 transition active:scale-95 md:hidden safe-bottom"
-        style={{ bottom: "calc(env(safe-area-inset-bottom) + 80px)" }}
+        className="fixed right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-[var(--accent)] text-white transition active:scale-90 md:hidden no-select"
+        style={{
+          bottom: "calc(env(safe-area-inset-bottom) + 76px)",
+          boxShadow: "var(--shadow-accent)",
+        }}
         aria-label="Ajouter une tâche"
       >
-        <Icon name="plus" size={24} />
+        <Icon name="plus" size={26} />
       </button>
 
       {/* Bottom nav (mobile only) */}
