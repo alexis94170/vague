@@ -3,6 +3,7 @@ import { todayISO } from "./dates";
 
 export type ViewKind =
   | { kind: "today" }
+  | { kind: "dashboard" }
   | { kind: "calendar" }
   | { kind: "untriaged" }
   | { kind: "all" }
@@ -25,6 +26,8 @@ export function filterTasks(tasks: Task[], view: ViewKind): Task[] {
       return tasks.filter((t) => !t.done && excludeWaiting(t));
     case "calendar":
       return tasks.filter((t) => !t.done && t.dueDate);
+    case "dashboard":
+      return tasks;
     case "waiting":
       return tasks.filter((t) => !t.done && t.waiting);
     case "completed":
@@ -49,6 +52,7 @@ export function filterTasks(tasks: Task[], view: ViewKind): Task[] {
 export function viewTitle(view: ViewKind, projectName?: string): string {
   switch (view.kind) {
     case "today": return "Aujourd'hui";
+    case "dashboard": return "Tableau de bord";
     case "calendar": return "Calendrier";
     case "untriaged": return "À trier";
     case "all": return "Toutes les tâches";

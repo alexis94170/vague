@@ -17,6 +17,7 @@ type Props = {
 };
 
 const VIEW_ITEMS: Array<{ kind: ViewKind["kind"]; label: string; icon: IconName }> = [
+  { kind: "dashboard", label: "Accueil", icon: "sparkles" },
   { kind: "today", label: "Aujourd'hui", icon: "sun" },
   { kind: "calendar", label: "Calendrier", icon: "calendar" },
   { kind: "untriaged", label: "À trier", icon: "inbox" },
@@ -43,6 +44,7 @@ export default function Sidebar({
   const counts = useMemo(() => {
     const today = todayISO();
     const c = {
+      dashboard: 0,
       today: 0,
       calendar: 0,
       untriaged: 0,
@@ -117,6 +119,7 @@ export default function Sidebar({
         <ul className="space-y-px">
           {VIEW_ITEMS.map((item) => {
             const count =
+              item.kind === "dashboard" ? 0 :
               item.kind === "today" ? counts.today :
               item.kind === "calendar" ? counts.calendar :
               item.kind === "untriaged" ? counts.untriaged :

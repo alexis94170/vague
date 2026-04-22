@@ -33,6 +33,7 @@ export default function CommandPalette({ open, onClose, onNavigate, onOpenTask }
   const items = useMemo<Item[]>(() => {
     const query = q.trim().toLowerCase();
     const views: Item[] = [
+      { kind: "view", view: { kind: "dashboard" }, label: "Tableau de bord", icon: "sparkles" },
       { kind: "view", view: { kind: "today" }, label: "Aujourd'hui", icon: "sun" },
       { kind: "view", view: { kind: "calendar" }, label: "Calendrier", icon: "calendar" },
       { kind: "view", view: { kind: "untriaged" }, label: "À trier", icon: "inbox" },
