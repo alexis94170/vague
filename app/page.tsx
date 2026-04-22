@@ -14,6 +14,8 @@ import ImportDialog from "./components/ImportDialog";
 import ExportDialog from "./components/ExportDialog";
 import TodayPicker from "./components/TodayPicker";
 import SettingsDialog from "./components/SettingsDialog";
+import DailyPlan from "./components/DailyPlan";
+import AssistantChat from "./components/AssistantChat";
 import Icon from "./components/Icon";
 import { todayISO } from "./lib/dates";
 
@@ -36,6 +38,8 @@ export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mobileAddOpen, setMobileAddOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [planOpen, setPlanOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -112,14 +116,32 @@ export default function Home() {
               <div className="mt-0.5 text-[12.5px] text-[var(--text-muted)]">{subtitle}</div>
             </div>
           </div>
-          <div className="flex shrink-0 items-center gap-3">
+          <div className="flex shrink-0 items-center gap-2">
+            {view.kind === "today" && (
+              <button
+                onClick={() => setPlanOpen(true)}
+                className="flex items-center gap-1.5 rounded-md bg-gradient-to-br from-indigo-500 to-violet-600 px-3 py-1.5 text-[12px] font-medium text-white shadow-sm transition active:scale-95"
+              >
+                <Icon name="sparkles" size={13} />
+                Planifier ma journée
+              </button>
+            )}
+            <button
+              onClick={() => setChatOpen(true)}
+              title="Assistant IA"
+              className="flex h-9 items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--bg-elev)] px-2.5 text-[12px] font-medium text-[var(--text-muted)] transition hover:border-[var(--accent)]/40 hover:text-[var(--accent)]"
+            >
+              <Icon name="sparkles" size={13} />
+              Assistant
+            </button>
             {view.kind === "today" && (
               <button
                 onClick={() => setTodayPickerOpen(true)}
-                className="flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--bg-elev)] px-2.5 py-1.5 text-[12px] font-medium text-[var(--text-muted)] transition hover:border-[var(--accent)]/40 hover:text-[var(--accent)]"
+                title="Ajouter des tâches existantes"
+                className="hidden items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--bg-elev)] px-2.5 py-1.5 text-[12px] font-medium text-[var(--text-muted)] transition hover:border-[var(--accent)]/40 hover:text-[var(--accent)] md:flex"
               >
                 <Icon name="plus" size={12} />
-                Ajouter des tâches existantes
+                Depuis la liste
               </button>
             )}
             <div className="hidden items-center gap-3 text-[11px] text-[var(--text-subtle)] lg:flex">
@@ -142,15 +164,24 @@ export default function Home() {
             >
               <Icon name="search" size={20} />
             </button>
-            {view.kind === "today" && (
+            <div className="flex items-center gap-2">
+              {view.kind === "today" && (
+                <button
+                  onClick={() => setPlanOpen(true)}
+                  className="no-select flex items-center gap-1.5 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 px-3 py-1.5 text-[12px] font-medium text-white active:scale-95"
+                >
+                  <Icon name="sparkles" size={12} />
+                  Planifier
+                </button>
+              )}
               <button
-                onClick={() => setTodayPickerOpen(true)}
-                className="no-select flex items-center gap-1.5 rounded-full bg-[var(--bg-hover)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-muted)] active:scale-95"
+                onClick={() => setChatOpen(true)}
+                className="no-select tappable flex items-center justify-center rounded-full text-[var(--text-muted)] active:bg-[var(--bg-hover)]"
+                aria-label="Assistant"
               >
-                <Icon name="plus" size={13} />
-                Ajouter
+                <Icon name="sparkles" size={20} />
               </button>
-            )}
+            </div>
           </div>
           <div className="px-4 pb-3 pt-1">
             <div className="flex items-center gap-2.5">
@@ -207,6 +238,8 @@ export default function Home() {
       <ExportDialog open={exportOpen} onClose={() => setExportOpen(false)} />
       <TodayPicker open={todayPickerOpen} onClose={() => setTodayPickerOpen(false)} />
       <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <DailyPlan open={planOpen} onClose={() => setPlanOpen(false)} />
+      <AssistantChat open={chatOpen} onClose={() => setChatOpen(false)} />
     </div>
   );
 }
