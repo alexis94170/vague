@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useStore } from "../store";
 import { Priority, PRIORITY_LABEL, RecurrenceUnit, Subtask, Task } from "../lib/types";
 import { newId } from "../lib/storage";
+import { usePomodoro } from "../pomodoro";
 import Icon from "./Icon";
 
 type Props = {
@@ -13,6 +14,7 @@ type Props = {
 
 export default function TaskDrawer({ taskId, onClose }: Props) {
   const { tasks, projects, patchTask, deleteTask } = useStore();
+  const { start: startPomodoro } = usePomodoro();
   const task = tasks.find((t) => t.id === taskId) ?? null;
 
   const [draft, setDraft] = useState<Task | null>(task);
@@ -126,6 +128,22 @@ export default function TaskDrawer({ taskId, onClose }: Props) {
               className="w-full resize-none rounded-lg border border-transparent bg-[var(--bg)] px-3 py-2 text-[13px] leading-relaxed outline-none transition hover:border-[var(--border)] focus:border-[var(--accent)]/40"
             />
           </div>
+
+          {!draft.done && (
+            <div className="mt-4 ml-8 flex flex-wrap gap-2">
+              <button
+                onClick={() => {
+                  startPomodoro({ taskId: draft.id, taskTitle: draft.title, minutes: draft.estimateMinutes && draft.estimateMinutes <= 60 ? draft.estimateMinutes : 25 });
+                  onClose();
+                }}
+                className="flex items-center gap-1.5 rounded-lg bg-gradient-to-br from-rose-500 to-orange-500 px-3 py-1.5 text-[12px] font-medium text-white transition active:scale-95"
+                title="Démarrer un focus sur cette tâche"
+              >
+                <Icon name="clock" size={13} />
+                Focus {draft.estimateMinutes && draft.estimateMinutes <= 60 ? `(${draft.estimateMinutes} min)` : "(25 min)"}
+              </button>
+            </div>
+          )}
 
           <div className="mt-6 grid grid-cols-2 gap-3">
             <Field label="Priorité" icon="flag">

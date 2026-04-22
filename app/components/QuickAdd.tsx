@@ -8,6 +8,7 @@ import { addDays, formatShort, todayISO, weekdayName } from "../lib/dates";
 import { Priority, PRIORITY_LABEL } from "../lib/types";
 import Icon from "./Icon";
 import Popover from "./Popover";
+import VoiceButton from "./VoiceButton";
 
 type Props = { view: ViewKind; onSubmitted?: () => void; autoFocus?: boolean };
 
@@ -118,7 +119,7 @@ export default function QuickAdd({ view, onSubmitted, autoFocus }: Props) {
       onSubmit={submit}
       className="overflow-visible rounded-xl border border-[var(--border)] bg-[var(--bg-elev)] shadow-sm transition hover:border-[var(--border-strong)] focus-within:border-[var(--accent)]/40 focus-within:shadow-[0_0_0_4px_var(--accent-soft)]"
     >
-      <div className="flex items-center gap-3 px-4 py-3">
+      <div className="flex items-center gap-2 px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3">
         <Icon name="plus" size={16} className="text-[var(--text-subtle)]" />
         <input
           ref={inputRef}
@@ -132,6 +133,15 @@ export default function QuickAdd({ view, onSubmitted, autoFocus }: Props) {
           }}
           placeholder="Ajouter une tâche…"
           className="flex-1 bg-transparent text-[14px] outline-none placeholder:text-[var(--text-subtle)]"
+        />
+        <VoiceButton
+          size="sm"
+          onTranscript={(text, isFinal) => {
+            if (isFinal) {
+              const merged = title.trim() ? title.trim() + " " + text : text;
+              onTitleChange(merged);
+            }
+          }}
         />
       </div>
 

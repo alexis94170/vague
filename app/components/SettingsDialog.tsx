@@ -1,6 +1,8 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { PALETTE_INFO, ThemeMode, ThemePalette, useTheme } from "../theme";
+import { notificationPermission, requestNotificationPermission } from "./Notifications";
 import Icon from "./Icon";
 
 type Props = {
@@ -10,6 +12,16 @@ type Props = {
 
 export default function SettingsDialog({ open, onClose }: Props) {
   const { mode, palette, setMode, setPalette } = useTheme();
+  const [notifPerm, setNotifPerm] = useState<string>("default");
+
+  useEffect(() => {
+    if (open) setNotifPerm(notificationPermission());
+  }, [open]);
+
+  async function handleNotifToggle() {
+    const result = await requestNotificationPermission();
+    setNotifPerm(result);
+  }
 
   if (!open) return null;
 
@@ -83,6 +95,37 @@ export default function SettingsDialog({ open, onClose }: Props) {
                   </button>
                 );
               })}
+            </div>
+          </section>
+
+          {/* Notifications */}
+          <section>
+            <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">Notifications</h3>
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--bg)] p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-[13px] font-medium">Rappels pour les échéances du jour</div>
+                  <div className="mt-0.5 text-[11.5px] text-[var(--text-muted)]">
+                    {notifPerm === "granted" && "Activé. Les rappels à l'heure apparaîtront."}
+                    {notifPerm === "denied" && "Bloqué. Active-le dans les réglages du navigateur."}
+                    {notifPerm === "default" && "Autorise pour recevoir les rappels."}
+                    {notifPerm === "unsupported" && "Non supporté sur ce navigateur."}
+                  </div>
+                </div>
+                {notifPerm === "default" && (
+                  <button
+                    onClick={handleNotifToggle}
+                    className="shrink-0 rounded-md bg-[var(--accent)] px-3 py-1.5 text-[12px] font-medium text-white"
+                  >
+                    Activer
+                  </button>
+                )}
+                {notifPerm === "granted" && (
+                  <span className="shrink-0 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-600 ring-1 ring-inset ring-emerald-500/20 dark:text-emerald-300">
+                    Activé
+                  </span>
+                )}
+              </div>
             </div>
           </section>
 

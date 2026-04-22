@@ -18,6 +18,8 @@ import DailyPlan from "./components/DailyPlan";
 import AssistantChat from "./components/AssistantChat";
 import CalendarView from "./components/CalendarView";
 import Dashboard from "./components/Dashboard";
+import PomodoroWidget from "./components/PomodoroWidget";
+import Notifications from "./components/Notifications";
 import Icon from "./components/Icon";
 import { todayISO } from "./lib/dates";
 
@@ -252,6 +254,8 @@ export default function Home() {
       <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <DailyPlan open={planOpen} onClose={() => setPlanOpen(false)} />
       <AssistantChat open={chatOpen} onClose={() => setChatOpen(false)} />
+      <PomodoroWidget />
+      <Notifications />
     </div>
   );
 }

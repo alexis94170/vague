@@ -5,6 +5,7 @@ import { AuthProvider } from "./auth";
 import AuthGate from "./AuthGate";
 import { StoreProvider } from "./store";
 import { ThemeProvider } from "./theme";
+import { PomodoroProvider } from "./pomodoro";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
@@ -35,7 +36,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeProvider>
           <AuthProvider>
             <AuthGate>
-              <StoreProvider>{children}</StoreProvider>
+              <StoreProvider>
+                <PomodoroProvider>{children}</PomodoroProvider>
+              </StoreProvider>
             </AuthGate>
           </AuthProvider>
         </ThemeProvider>
