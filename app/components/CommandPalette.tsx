@@ -34,6 +34,7 @@ export default function CommandPalette({ open, onClose, onNavigate, onOpenTask }
     const query = q.trim().toLowerCase();
     const views: Item[] = [
       { kind: "view", view: { kind: "today" }, label: "Aujourd'hui", icon: "sun" },
+      { kind: "view", view: { kind: "calendar" }, label: "Calendrier", icon: "calendar" },
       { kind: "view", view: { kind: "untriaged" }, label: "À trier", icon: "inbox" },
       { kind: "view", view: { kind: "all" }, label: "Toutes les tâches", icon: "list" },
       { kind: "view", view: { kind: "waiting" }, label: "En attente", icon: "pause" },

@@ -18,6 +18,7 @@ type Props = {
 
 const VIEW_ITEMS: Array<{ kind: ViewKind["kind"]; label: string; icon: IconName }> = [
   { kind: "today", label: "Aujourd'hui", icon: "sun" },
+  { kind: "calendar", label: "Calendrier", icon: "calendar" },
   { kind: "untriaged", label: "À trier", icon: "inbox" },
   { kind: "all", label: "Toutes", icon: "list" },
   { kind: "waiting", label: "En attente", icon: "pause" },
@@ -43,6 +44,7 @@ export default function Sidebar({
     const today = todayISO();
     const c = {
       today: 0,
+      calendar: 0,
       untriaged: 0,
       all: 0,
       waiting: 0,
@@ -64,6 +66,7 @@ export default function Sidebar({
       }
       c.all++;
       if (!t.projectId || t.projectId === "inbox") c.untriaged++;
+      if (t.dueDate) c.calendar++;
       if (t.dueDate && t.dueDate <= today) c.today++;
       if (t.projectId) {
         c.byProject.set(t.projectId, (c.byProject.get(t.projectId) ?? 0) + 1);
@@ -115,6 +118,7 @@ export default function Sidebar({
           {VIEW_ITEMS.map((item) => {
             const count =
               item.kind === "today" ? counts.today :
+              item.kind === "calendar" ? counts.calendar :
               item.kind === "untriaged" ? counts.untriaged :
               item.kind === "all" ? counts.all :
               item.kind === "waiting" ? counts.waiting :

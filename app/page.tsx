@@ -16,6 +16,7 @@ import TodayPicker from "./components/TodayPicker";
 import SettingsDialog from "./components/SettingsDialog";
 import DailyPlan from "./components/DailyPlan";
 import AssistantChat from "./components/AssistantChat";
+import CalendarView from "./components/CalendarView";
 import Icon from "./components/Icon";
 import { todayISO } from "./lib/dates";
 
@@ -199,8 +200,12 @@ export default function Home() {
           <QuickAdd view={view} />
         </div>
 
-        <div className="mx-auto w-full max-w-3xl flex-1 px-3 pb-6 pt-3 sm:px-6 md:pb-24 md:pt-4">
-          <TaskList view={view} onOpenTask={setOpenTaskId} />
+        <div className="mx-auto w-full max-w-4xl flex-1 px-3 pb-6 pt-3 sm:px-6 md:pb-24 md:pt-4">
+          {view.kind === "calendar" ? (
+            <CalendarView onOpenTask={setOpenTaskId} />
+          ) : (
+            <TaskList view={view} onOpenTask={setOpenTaskId} />
+          )}
         </div>
       </main>
 
