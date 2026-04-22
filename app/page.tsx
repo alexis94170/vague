@@ -5,6 +5,8 @@ import { useStore } from "./store";
 import { ViewKind, viewTitle } from "./lib/views";
 import Sidebar from "./components/Sidebar";
 import QuickAdd from "./components/QuickAdd";
+import MobileQuickAdd from "./components/MobileQuickAdd";
+import BottomNav from "./components/BottomNav";
 import TaskList from "./components/TaskList";
 import TaskDrawer from "./components/TaskDrawer";
 import CommandPalette from "./components/CommandPalette";
@@ -31,6 +33,7 @@ export default function Home() {
   const [exportOpen, setExportOpen] = useState(false);
   const [todayPickerOpen, setTodayPickerOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [mobileAddOpen, setMobileAddOpen] = useState(false);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -75,13 +78,13 @@ export default function Home() {
       {sidebarOpen && (
         <div
           onClick={() => setSidebarOpen(false)}
-          className="fixed inset-0 z-30 bg-black/40 md:hidden anim-fade-in"
+          className="fixed inset-0 z-40 bg-black/40 md:hidden anim-fade-in"
         />
       )}
 
       {/* Sidebar: fixed drawer on mobile, static on desktop */}
       <div
-        className={`fixed inset-y-0 left-0 z-40 transform transition-transform duration-200 md:static md:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 transform transition-transform duration-200 md:static md:translate-x-0 ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -94,36 +97,26 @@ export default function Home() {
         />
       </div>
 
-      <main className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-[var(--border)] glass px-4 py-3 sm:px-8 sm:py-5">
-          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-            <button
-              onClick={() => setSidebarOpen(true)}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-[var(--text-muted)] hover:bg-[var(--bg-hover)] md:hidden"
-              aria-label="Ouvrir le menu"
-            >
-              <Icon name="menu" size={20} />
-            </button>
+      <main className="flex min-w-0 flex-1 flex-col safe-b-nav md:pb-0">
+        {/* Desktop header */}
+        <header className="sticky top-0 z-20 hidden items-center justify-between gap-3 border-b border-[var(--border)] glass px-8 py-5 md:flex">
+          <div className="flex min-w-0 items-center gap-3">
             {project && (
-              <span
-                className="h-3 w-3 shrink-0 rounded-full shadow-sm"
-                style={{ background: project.color }}
-              />
+              <span className="h-3 w-3 shrink-0 rounded-full shadow-sm" style={{ background: project.color }} />
             )}
             <div className="min-w-0">
-              <h2 className="truncate text-lg font-semibold tracking-tight sm:text-xl">{title}</h2>
-              <div className="mt-0.5 truncate text-[11.5px] text-[var(--text-muted)] sm:text-[12.5px]">{subtitle}</div>
+              <h2 className="truncate text-xl font-semibold tracking-tight">{title}</h2>
+              <div className="mt-0.5 text-[12.5px] text-[var(--text-muted)]">{subtitle}</div>
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-3">
             {view.kind === "today" && (
               <button
                 onClick={() => setTodayPickerOpen(true)}
-                className="flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--bg-elev)] px-2 py-1.5 text-[11.5px] font-medium text-[var(--text-muted)] transition hover:border-[var(--accent)]/40 hover:text-[var(--accent)] sm:px-2.5 sm:text-[12px]"
+                className="flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--bg-elev)] px-2.5 py-1.5 text-[12px] font-medium text-[var(--text-muted)] transition hover:border-[var(--accent)]/40 hover:text-[var(--accent)]"
               >
                 <Icon name="plus" size={12} />
-                <span className="hidden sm:inline">Ajouter des tâches existantes</span>
-                <span className="sm:hidden">Ajouter</span>
+                Ajouter des tâches existantes
               </button>
             )}
             <div className="hidden items-center gap-3 text-[11px] text-[var(--text-subtle)] lg:flex">
@@ -136,14 +129,63 @@ export default function Home() {
           </div>
         </header>
 
-        <div className="mx-auto w-full max-w-3xl px-3 pt-4 sm:px-6 sm:pt-6">
+        {/* Mobile header: large title iOS-style */}
+        <header className="sticky top-0 z-20 border-b border-[var(--border)] bg-[var(--bg)]/95 backdrop-blur-lg safe-top md:hidden">
+          <div className="flex items-center justify-between px-4 pb-2 pt-3">
+            <button
+              onClick={() => setPaletteOpen(true)}
+              className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"
+              aria-label="Rechercher"
+            >
+              <Icon name="search" size={18} />
+            </button>
+            {view.kind === "today" && (
+              <button
+                onClick={() => setTodayPickerOpen(true)}
+                className="flex items-center gap-1.5 rounded-full bg-[var(--bg-hover)] px-3 py-1.5 text-[11.5px] font-medium text-[var(--text-muted)]"
+              >
+                <Icon name="plus" size={12} />
+                Ajouter
+              </button>
+            )}
+          </div>
+          <div className="px-4 pb-3">
+            <div className="flex items-center gap-2">
+              {project && (
+                <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: project.color }} />
+              )}
+              <h2 className="truncate text-[26px] font-bold tracking-tight">{title}</h2>
+            </div>
+            <div className="mt-0.5 text-[12.5px] text-[var(--text-muted)]">{subtitle}</div>
+          </div>
+        </header>
+
+        {/* Desktop quick-add */}
+        <div className="mx-auto hidden w-full max-w-3xl px-6 pt-6 md:block">
           <QuickAdd view={view} />
         </div>
 
-        <div className="mx-auto w-full max-w-3xl flex-1 px-3 pb-24 pt-4 sm:px-6">
+        <div className="mx-auto w-full max-w-3xl flex-1 px-3 pb-6 pt-3 sm:px-6 md:pb-24 md:pt-4">
           <TaskList view={view} onOpenTask={setOpenTaskId} />
         </div>
       </main>
+
+      {/* Mobile FAB */}
+      <button
+        onClick={() => setMobileAddOpen(true)}
+        className="fixed bottom-20 right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-[var(--accent)] text-white shadow-lg shadow-indigo-500/30 transition active:scale-95 md:hidden safe-bottom"
+        style={{ bottom: "calc(env(safe-area-inset-bottom) + 80px)" }}
+        aria-label="Ajouter une tâche"
+      >
+        <Icon name="plus" size={24} />
+      </button>
+
+      {/* Bottom nav (mobile only) */}
+      <BottomNav
+        view={view}
+        onViewChange={navigate}
+        onOpenMore={() => setSidebarOpen(true)}
+      />
 
       <TaskDrawer taskId={openTaskId} onClose={() => setOpenTaskId(null)} />
 
@@ -154,6 +196,7 @@ export default function Home() {
         onOpenTask={setOpenTaskId}
       />
 
+      <MobileQuickAdd open={mobileAddOpen} onClose={() => setMobileAddOpen(false)} view={view} />
       <ImportDialog open={importOpen} onClose={() => setImportOpen(false)} />
       <ExportDialog open={exportOpen} onClose={() => setExportOpen(false)} />
       <TodayPicker open={todayPickerOpen} onClose={() => setTodayPickerOpen(false)} />

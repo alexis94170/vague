@@ -9,7 +9,7 @@ import { Priority, PRIORITY_LABEL } from "../lib/types";
 import Icon from "./Icon";
 import Popover from "./Popover";
 
-type Props = { view: ViewKind };
+type Props = { view: ViewKind; onSubmitted?: () => void; autoFocus?: boolean };
 
 const PRIORITY_DOT: Record<Priority, string> = {
   urgent: "bg-rose-500",
@@ -19,7 +19,7 @@ const PRIORITY_DOT: Record<Priority, string> = {
   none: "bg-[var(--text-subtle)]/40",
 };
 
-export default function QuickAdd({ view }: Props) {
+export default function QuickAdd({ view, onSubmitted, autoFocus }: Props) {
   const { projects, addTaskFromParsed, addProject, allTags } = useStore();
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -58,6 +58,10 @@ export default function QuickAdd({ view }: Props) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  useEffect(() => {
+    if (autoFocus) inputRef.current?.focus();
+  }, [autoFocus]);
 
   const parsedTokens = useMemo(() => parseInput(title, projects).tokens, [title, projects]);
 
@@ -103,7 +107,8 @@ export default function QuickAdd({ view }: Props) {
       projectId
     );
     reset();
-    inputRef.current?.focus();
+    if (onSubmitted) onSubmitted();
+    else inputRef.current?.focus();
   }
 
   const project = projects.find((p) => p.id === projectId);
