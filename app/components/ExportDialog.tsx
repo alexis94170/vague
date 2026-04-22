@@ -91,10 +91,10 @@ export default function ExportDialog({ open, onClose }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[60] flex items-stretch justify-center bg-black/40 sm:items-center sm:p-4" onClick={onClose}>
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-lg overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg-elev)] shadow-2xl"
+        className="flex w-full flex-col overflow-hidden bg-[var(--bg-elev)] shadow-2xl sm:max-h-[90vh] sm:max-w-lg sm:rounded-xl sm:border sm:border-[var(--border)]"
       >
         <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3">
           <div className="flex gap-1">

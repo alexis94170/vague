@@ -140,7 +140,7 @@ export default function TaskRow({ task, selected, onToggleSelect, onOpen }: Prop
       </button>
 
       {!task.done && (
-        <div className="invisible absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-1 group-hover:visible">
+        <div className="invisible absolute right-3 top-1/2 hidden -translate-y-1/2 items-center gap-1 group-hover:visible md:flex">
           {!isToday && !task.waiting && (
             <button
               onClick={(e) => {

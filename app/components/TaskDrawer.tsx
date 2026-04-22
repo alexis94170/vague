@@ -66,7 +66,7 @@ export default function TaskDrawer({ taskId, onClose }: Props) {
   return (
     <>
       <div className="fixed inset-0 z-40 bg-black/20 anim-fade-in" onClick={onClose} />
-      <aside className="fixed right-0 top-0 z-50 flex h-screen w-full max-w-md flex-col border-l border-[var(--border)] bg-[var(--bg-elev)] shadow-2xl anim-slide-in">
+      <aside className="fixed inset-0 z-50 flex flex-col border-l border-[var(--border)] bg-[var(--bg-elev)] shadow-2xl anim-slide-in sm:inset-y-0 sm:left-auto sm:right-0 sm:h-screen sm:w-full sm:max-w-md">
         <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-3">
           <h2 className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
             Détail de la tâche

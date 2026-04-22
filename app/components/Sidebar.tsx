@@ -88,7 +88,7 @@ export default function Sidebar({
   }
 
   return (
-    <aside className="sticky top-0 flex h-screen w-64 shrink-0 flex-col border-r border-[var(--border)] bg-[var(--bg)]/80 backdrop-blur">
+    <aside className="flex h-screen w-64 shrink-0 flex-col border-r border-[var(--border)] bg-[var(--bg-elev)] md:bg-[var(--bg)]/80 md:backdrop-blur">
       <div className="flex items-center justify-between px-5 py-5">
         <div className="flex items-center gap-2">
           <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-sm">

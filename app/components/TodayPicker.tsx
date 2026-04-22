@@ -85,10 +85,10 @@ export default function TodayPicker({ open, onClose }: Props) {
   const hasProjects = projects.filter((p) => p.id !== "inbox").length > 0;
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-start justify-center bg-black/30 pt-16 anim-fade-in" onClick={onClose}>
+    <div className="fixed inset-0 z-[60] flex items-stretch justify-center bg-black/30 anim-fade-in sm:items-start sm:pt-16" onClick={onClose}>
       <div
         onClick={(e) => e.stopPropagation()}
-        className="flex max-h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg-elev)] shadow-2xl anim-scale-in"
+        className="flex w-full flex-col overflow-hidden bg-[var(--bg-elev)] shadow-2xl anim-scale-in sm:max-h-[80vh] sm:max-w-2xl sm:rounded-xl sm:border sm:border-[var(--border)]"
       >
         <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3">
           <div className="flex items-center gap-2">

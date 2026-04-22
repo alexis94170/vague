@@ -25,6 +25,7 @@ export type IconName =
   | "sparkles"
   | "chevron-right"
   | "pause"
+  | "menu"
   | "dots";
 
 const paths: Record<IconName, React.ReactNode> = {
@@ -122,6 +123,7 @@ const paths: Record<IconName, React.ReactNode> = {
       <rect x="14" y="4" width="4" height="16" rx="1" />
     </>
   ),
+  menu: <path d="M3 6h18M3 12h18M3 18h18" />,
   dots: (
     <>
       <circle cx="12" cy="12" r="1" />

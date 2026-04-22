@@ -87,10 +87,10 @@ export default function CommandPalette({ open, onClose, onNavigate, onOpenTask }
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-start justify-center bg-black/30 pt-24 anim-fade-in" onClick={onClose}>
+    <div className="fixed inset-0 z-[60] flex items-start justify-center bg-black/30 pt-4 anim-fade-in sm:pt-24" onClick={onClose}>
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-xl overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg-elev)] shadow-2xl anim-scale-in"
+        className="mx-2 w-full max-w-xl overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg-elev)] shadow-2xl anim-scale-in sm:mx-0"
       >
         <div className="flex items-center gap-3 border-b border-[var(--border)] px-4 py-3">
           <Icon name="search" size={16} className="text-[var(--text-subtle)]" />

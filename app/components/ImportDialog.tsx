@@ -95,12 +95,12 @@ export default function ImportDialog({ open, onClose }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4"
+      className="fixed inset-0 z-[60] flex items-stretch justify-center bg-black/40 sm:items-center sm:p-4"
       onClick={resetAndClose}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-2xl dark:border-zinc-800 dark:bg-zinc-900"
+        className="flex w-full flex-col overflow-hidden bg-white shadow-2xl dark:bg-zinc-900 sm:max-h-[85vh] sm:max-w-2xl sm:rounded-xl sm:border sm:border-zinc-200 sm:dark:border-zinc-800"
       >
         <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
           <div className="flex gap-1">
