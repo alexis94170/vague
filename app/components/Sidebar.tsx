@@ -13,6 +13,7 @@ type Props = {
   onOpenImport: () => void;
   onOpenExport: () => void;
   onOpenPalette: () => void;
+  onOpenSettings: () => void;
 };
 
 const VIEW_ITEMS: Array<{ kind: ViewKind["kind"]; label: string; icon: IconName }> = [
@@ -29,6 +30,7 @@ export default function Sidebar({
   onOpenImport,
   onOpenExport,
   onOpenPalette,
+  onOpenSettings,
 }: Props) {
   const { projects, tasks, allTags, addProject, deleteProject, renameProject, syncing, syncError } = useStore();
   const { user, signOut } = useAuth();
@@ -281,6 +283,13 @@ export default function Sidebar({
         >
           <Icon name="download" size={13} className="text-[var(--text-subtle)]" />
           Exporter
+        </button>
+        <button
+          onClick={onOpenSettings}
+          className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[12px] text-[var(--text-muted)] transition hover:bg-[var(--bg-hover)] hover:text-[var(--text)]"
+        >
+          <Icon name="dots" size={13} className="text-[var(--text-subtle)]" />
+          Réglages
         </button>
       </div>
 

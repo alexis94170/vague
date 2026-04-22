@@ -23,8 +23,31 @@
   --shadow-accent: 0 8px 24px rgba(99, 102, 241, 0.25);
 }
 
+/* Dark mode — applied via .theme-dark class (ThemeProvider handles system preference) */
+.theme-dark {
+  --bg: #1a1b20;
+  --bg-elev: #24262d;
+  --bg-hover: #2e3039;
+  --bg-sunken: #17181c;
+  --border: #33353f;
+  --border-strong: #454753;
+  --text: #f4f4f5;
+  --text-muted: #b8bac4;
+  --text-subtle: #8a8c97;
+  --accent: #a5b4fc;
+  --accent-hover: #c7d2fe;
+  --accent-soft: rgba(129, 140, 248, 0.14);
+  --accent-soft-2: rgba(129, 140, 248, 0.22);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.15);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.2);
+  --shadow-accent: 0 8px 24px rgba(129, 140, 248, 0.25);
+  color-scheme: dark;
+}
+
+/* Fallback: also apply if system is dark and no explicit class */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not(.theme-light) {
     --bg: #1a1b20;
     --bg-elev: #24262d;
     --bg-hover: #2e3039;
@@ -42,6 +65,7 @@
     --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.15);
     --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.2);
     --shadow-accent: 0 8px 24px rgba(129, 140, 248, 0.25);
+    color-scheme: dark;
   }
 }
 

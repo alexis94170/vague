@@ -4,6 +4,7 @@ import "./globals.css";
 import { AuthProvider } from "./auth";
 import AuthGate from "./AuthGate";
 import { StoreProvider } from "./store";
+import { ThemeProvider } from "./theme";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
@@ -31,11 +32,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="fr" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="min-h-full bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100">
-        <AuthProvider>
-          <AuthGate>
-            <StoreProvider>{children}</StoreProvider>
-          </AuthGate>
-        </AuthProvider>
+        <ThemeProvider>
+          <AuthProvider>
+            <AuthGate>
+              <StoreProvider>{children}</StoreProvider>
+            </AuthGate>
+          </AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

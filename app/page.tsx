@@ -13,6 +13,7 @@ import CommandPalette from "./components/CommandPalette";
 import ImportDialog from "./components/ImportDialog";
 import ExportDialog from "./components/ExportDialog";
 import TodayPicker from "./components/TodayPicker";
+import SettingsDialog from "./components/SettingsDialog";
 import Icon from "./components/Icon";
 import { todayISO } from "./lib/dates";
 
@@ -34,6 +35,7 @@ export default function Home() {
   const [todayPickerOpen, setTodayPickerOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mobileAddOpen, setMobileAddOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -94,6 +96,7 @@ export default function Home() {
           onOpenImport={() => { setImportOpen(true); setSidebarOpen(false); }}
           onOpenExport={() => { setExportOpen(true); setSidebarOpen(false); }}
           onOpenPalette={() => { setPaletteOpen(true); setSidebarOpen(false); }}
+          onOpenSettings={() => { setSettingsOpen(true); setSidebarOpen(false); }}
         />
       </div>
 
@@ -203,6 +206,7 @@ export default function Home() {
       <ImportDialog open={importOpen} onClose={() => setImportOpen(false)} />
       <ExportDialog open={exportOpen} onClose={() => setExportOpen(false)} />
       <TodayPicker open={todayPickerOpen} onClose={() => setTodayPickerOpen(false)} />
+      <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>
   );
 }
