@@ -20,6 +20,7 @@ import CalendarView from "./components/CalendarView";
 import Dashboard from "./components/Dashboard";
 import PomodoroWidget from "./components/PomodoroWidget";
 import Notifications from "./components/Notifications";
+import InstallPrompt from "./components/InstallPrompt";
 import Icon from "./components/Icon";
 import { todayISO } from "./lib/dates";
 
@@ -256,6 +257,7 @@ export default function Home() {
       <AssistantChat open={chatOpen} onClose={() => setChatOpen(false)} />
       <PomodoroWidget />
       <Notifications />
+      <InstallPrompt />
     </div>
   );
 }
