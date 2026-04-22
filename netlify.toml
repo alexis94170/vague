@@ -1,5 +1,5 @@
 [build]
-  command = "rm -f package-lock.json && npm install --include=optional --no-audit --no-fund && npm run build"
+  command = "rm -rf node_modules package-lock.json .next && npm install --include=optional --no-audit --no-fund && npm run build"
   publish = ".next"
 
 [build.environment]
