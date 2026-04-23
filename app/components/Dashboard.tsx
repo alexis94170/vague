@@ -6,6 +6,7 @@ import { useAuth } from "../auth";
 import { addDays, todayISO, diffDays, parseISODate } from "../lib/dates";
 import { Task } from "../lib/types";
 import Icon from "./Icon";
+import SuggestionsPanel from "./SuggestionsPanel";
 
 type Props = {
   onOpenPlan: () => void;
@@ -135,6 +136,9 @@ export default function Dashboard({ onOpenPlan, onOpenChat, onNavigate }: Props)
           </button>
         </div>
       </div>
+
+      {/* AI Suggestions */}
+      <SuggestionsPanel />
 
       {/* Key stats grid */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

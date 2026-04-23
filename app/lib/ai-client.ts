@@ -68,6 +68,45 @@ export async function aiPlan(tasks: Task[], projects: Project[], opts?: { availa
   return res.json();
 }
 
+export type Suggestion = {
+  kind: "focus" | "reschedule" | "followup" | "cleanup" | "waiting" | "insight";
+  title: string;
+  taskIds: string[];
+  action: "mark_today" | "snooze_tomorrow" | "snooze_week" | "mark_waiting" | "delete" | "none";
+};
+
+export type SuggestResult = {
+  headline: string;
+  suggestions: Suggestion[];
+};
+
+export async function aiSuggest(tasks: Task[], projects: Project[]): Promise<SuggestResult> {
+  const projectsById = new Map(projects.map((p) => [p.id, p.name]));
+  const candidates = tasks
+    .filter((t) => !t.done)
+    .map((t) => ({
+      id: t.id,
+      title: t.title,
+      priority: t.priority,
+      projectName: t.projectId ? projectsById.get(t.projectId) : undefined,
+      dueDate: t.dueDate,
+      waiting: t.waiting,
+      waitingFor: t.waitingFor,
+      tags: t.tags,
+      createdAt: t.createdAt,
+    }));
+  const res = await fetch("/api/ai/suggest", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ tasks: candidates, today: todayISO() }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Erreur" }));
+    throw new Error(err.error ?? `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
 export async function aiChat(
   messages: Array<{ role: "user" | "assistant"; content: string }>,
   tasks: Task[],

@@ -84,3 +84,43 @@ self.addEventListener("fetch", (event) => {
 self.addEventListener("message", (event) => {
   if (event.data === "skip-waiting") self.skipWaiting();
 });
+
+// === Push notifications ===
+self.addEventListener("push", (event) => {
+  let data = { title: "Vague", body: "", url: "/", tag: "vague-notification" };
+  try {
+    if (event.data) data = { ...data, ...event.data.json() };
+  } catch {
+    if (event.data) data.body = event.data.text();
+  }
+  const options = {
+    body: data.body,
+    icon: "/icon-192.png",
+    badge: "/favicon-32.png",
+    tag: data.tag,
+    renotify: true,
+    requireInteraction: false,
+    data: { url: data.url || "/" },
+    actions: data.actions || undefined,
+  };
+  event.waitUntil(self.registration.showNotification(data.title, options));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const target = event.notification.data?.url || "/";
+  event.waitUntil(
+    (async () => {
+      const clientsList = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      for (const client of clientsList) {
+        if ("focus" in client) {
+          await client.navigate(target).catch(() => {});
+          return client.focus();
+        }
+      }
+      if (self.clients.openWindow) {
+        return self.clients.openWindow(target);
+      }
+    })()
+  );
+});

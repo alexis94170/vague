@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { PALETTE_INFO, ThemeMode, ThemePalette, useTheme } from "../theme";
 import { notificationPermission, requestNotificationPermission } from "./Notifications";
+import { isPushSupported, isSubscribed, sendTestPush, subscribeToPush, unsubscribeFromPush } from "../lib/push-client";
 import Icon from "./Icon";
 
 type Props = {
@@ -13,14 +14,54 @@ type Props = {
 export default function SettingsDialog({ open, onClose }: Props) {
   const { mode, palette, setMode, setPalette } = useTheme();
   const [notifPerm, setNotifPerm] = useState<string>("default");
+  const [pushOn, setPushOn] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushMsg, setPushMsg] = useState<string | null>(null);
 
   useEffect(() => {
-    if (open) setNotifPerm(notificationPermission());
+    if (open) {
+      setNotifPerm(notificationPermission());
+      isSubscribed().then(setPushOn);
+    }
   }, [open]);
 
   async function handleNotifToggle() {
     const result = await requestNotificationPermission();
     setNotifPerm(result);
+  }
+
+  async function togglePush() {
+    setPushBusy(true);
+    setPushMsg(null);
+    try {
+      if (pushOn) {
+        await unsubscribeFromPush();
+        setPushOn(false);
+        setPushMsg("Notifications push désactivées");
+      } else {
+        const r = await subscribeToPush();
+        if (r.ok) {
+          setPushOn(true);
+          setPushMsg("Notifications push activées 🌊");
+        } else {
+          setPushMsg(r.error ?? "Échec");
+        }
+      }
+    } finally {
+      setPushBusy(false);
+    }
+  }
+
+  async function testPush() {
+    setPushBusy(true);
+    setPushMsg(null);
+    try {
+      const r = await sendTestPush();
+      if (r.ok) setPushMsg(`Notification envoyée (${r.sent})`);
+      else setPushMsg(r.error ?? "Échec");
+    } finally {
+      setPushBusy(false);
+    }
   }
 
   if (!open) return null;
@@ -98,17 +139,17 @@ export default function SettingsDialog({ open, onClose }: Props) {
             </div>
           </section>
 
-          {/* Notifications */}
+          {/* Notifications locales */}
           <section>
-            <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">Notifications</h3>
+            <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">Rappels locaux</h3>
             <div className="rounded-xl border border-[var(--border)] bg-[var(--bg)] p-4">
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <div className="text-[13px] font-medium">Rappels pour les échéances du jour</div>
                   <div className="mt-0.5 text-[11.5px] text-[var(--text-muted)]">
-                    {notifPerm === "granted" && "Activé. Les rappels à l'heure apparaîtront."}
+                    {notifPerm === "granted" && "Activé. Fonctionne uniquement quand l'app est ouverte."}
                     {notifPerm === "denied" && "Bloqué. Active-le dans les réglages du navigateur."}
-                    {notifPerm === "default" && "Autorise pour recevoir les rappels."}
+                    {notifPerm === "default" && "Autorise pour recevoir les rappels quand l'app est ouverte."}
                     {notifPerm === "unsupported" && "Non supporté sur ce navigateur."}
                   </div>
                 </div>
@@ -126,6 +167,50 @@ export default function SettingsDialog({ open, onClose }: Props) {
                   </span>
                 )}
               </div>
+            </div>
+          </section>
+
+          {/* Push notifications */}
+          <section>
+            <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">Notifications push</h3>
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--bg)] p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-[13px] font-medium">Recevoir les rappels même app fermée</div>
+                  <div className="mt-0.5 text-[11.5px] text-[var(--text-muted)]">
+                    {!isPushSupported() && "Non supporté sur ce navigateur. Installe Vague pour y accéder."}
+                    {isPushSupported() && pushOn && "Tu recevras les rappels sur tous tes appareils abonnés."}
+                    {isPushSupported() && !pushOn && "Active pour recevoir les rappels importants (retards, planification quotidienne)."}
+                  </div>
+                </div>
+                {isPushSupported() && (
+                  <button
+                    onClick={togglePush}
+                    disabled={pushBusy}
+                    className={`shrink-0 rounded-md px-3 py-1.5 text-[12px] font-medium transition disabled:opacity-50 ${
+                      pushOn
+                        ? "bg-[var(--bg-hover)] text-[var(--text)]"
+                        : "bg-[var(--accent)] text-white"
+                    }`}
+                  >
+                    {pushBusy ? "…" : pushOn ? "Désactiver" : "Activer"}
+                  </button>
+                )}
+              </div>
+              {pushOn && (
+                <div className="mt-3 flex items-center gap-2 border-t border-[var(--border)] pt-3">
+                  <button
+                    onClick={testPush}
+                    disabled={pushBusy}
+                    className="rounded-md border border-[var(--border)] bg-[var(--bg-elev)] px-3 py-1.5 text-[11.5px] font-medium text-[var(--text-muted)] hover:text-[var(--text)] disabled:opacity-50"
+                  >
+                    Envoyer un test
+                  </button>
+                </div>
+              )}
+              {pushMsg && (
+                <div className="mt-2 text-[11px] text-[var(--accent)]">{pushMsg}</div>
+              )}
             </div>
           </section>
 

@@ -31,6 +31,16 @@ import {
   upsertTasks,
 } from "./lib/db";
 import { supabase } from "./lib/supabase";
+import {
+  cacheState,
+  enqueue as enqueueOffline,
+  isOnline,
+  loadCachedState,
+  loadQueue,
+  QueueOp,
+  removeOp,
+  saveQueue,
+} from "./lib/offline-queue";
 
 type Ctx = {
   state: AppState;
@@ -40,6 +50,8 @@ type Ctx = {
   loading: boolean;
   syncing: boolean;
   syncError: string | null;
+  online: boolean;
+  pendingOps: number;
   addTaskFromParsed: (p: ParsedInput, fallbackProjectId?: string) => Task;
   addTask: (input: Partial<Task> & { title: string }) => Task;
   bulkAddTasks: (titles: string[], projectId?: string) => void;
@@ -76,28 +88,53 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
+  const [online, setOnline] = useState(true);
+  const [pendingOps, setPendingOps] = useState(0);
   const pending = useRef(0);
+  const refreshQueueCount = useCallback(() => setPendingOps(loadQueue().length), []);
 
-  // Load from DB when user available
+  // Load from DB when user available — use cache first for instant boot
   const load = useCallback(async () => {
     if (!user) {
       setState(EMPTY);
       setLoading(false);
       return;
     }
-    setLoading(true);
+    // 1. Show cached state immediately for snappy offline boot
+    const cached = loadCachedState();
+    if (cached) {
+      setState({ version: 2, projects: cached.projects, tasks: cached.tasks, settings: { theme: "system" } });
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+    // 2. Fetch fresh if online
+    if (!isOnline()) {
+      setLoading(false);
+      setSyncError("Hors-ligne — données en cache");
+      return;
+    }
     try {
       const data = await fetchAll(user.id);
       setState(data);
+      cacheState({ projects: data.projects, tasks: data.tasks });
       setSyncError(null);
     } catch (e) {
       const msg = (e as Error).message;
-      setSyncError(`Chargement impossible : ${msg}`);
+      if (!cached) setSyncError(`Chargement impossible : ${msg}`);
       console.error("fetchAll failed", e);
     } finally {
       setLoading(false);
     }
   }, [user]);
+
+  // Cache state on every change
+  useEffect(() => {
+    if (loading) return;
+    if (state.projects.length > 0 || state.tasks.length > 0) {
+      cacheState({ projects: state.projects, tasks: state.tasks });
+    }
+  }, [state, loading]);
 
   useEffect(() => {
     load();
@@ -119,7 +156,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return () => { sb.removeChannel(channel); };
   }, [user, load]);
 
-  const withSync = useCallback(async (op: () => Promise<void>) => {
+  const withSync = useCallback(async (op: () => Promise<void>, queueOp?: QueueOp) => {
+    // If offline and we have a queueable op, enqueue it and skip the live call
+    if (!isOnline() && queueOp) {
+      enqueueOffline(queueOp);
+      refreshQueueCount();
+      return;
+    }
     pending.current += 1;
     setSyncing(true);
     try {
@@ -127,13 +170,82 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setSyncError(null);
     } catch (e) {
       const msg = (e as Error).message;
-      setSyncError(msg);
+      // Likely a network failure — enqueue for later if we have an op
+      if (queueOp && /failed|network|fetch|offline/i.test(msg)) {
+        enqueueOffline(queueOp);
+        refreshQueueCount();
+        setSyncError("Sync impossible — en attente de reconnexion");
+      } else {
+        setSyncError(msg);
+      }
       console.error("sync failed", e);
     } finally {
       pending.current -= 1;
       if (pending.current <= 0) setSyncing(false);
     }
-  }, []);
+  }, [refreshQueueCount]);
+
+  // Online/offline detection + queue flush
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onOnline = () => {
+      setOnline(true);
+      flushQueue();
+    };
+    const onOffline = () => setOnline(false);
+    setOnline(navigator.onLine);
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+    return () => {
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
+  // Flush queued ops when back online
+  const flushQueue = useCallback(async () => {
+    if (!user || !isOnline()) return;
+    const ops = loadQueue();
+    if (ops.length === 0) return;
+    setSyncing(true);
+    for (const op of ops) {
+      try {
+        switch (op.kind) {
+          case "upsertTask":
+            await upsertTask(op.task, user.id);
+            break;
+          case "upsertTasks":
+            await upsertTasks(op.tasks, user.id);
+            break;
+          case "deleteTask":
+            await deleteTaskDb(op.id);
+            break;
+          case "deleteTasks":
+            await deleteTasksDb(op.ids);
+            break;
+          case "upsertProject":
+            await upsertProject(op.project, user.id);
+            break;
+          case "deleteProject":
+            await deleteProjectDb(op.id);
+            break;
+        }
+        removeOp(op.id);
+      } catch (e) {
+        console.warn("Flush op failed, keeping in queue:", e);
+        break; // stop; retry next time
+      }
+    }
+    refreshQueueCount();
+    setSyncing(false);
+  }, [user, refreshQueueCount]);
+
+  // Initial queue count + attempt flush on mount
+  useEffect(() => {
+    refreshQueueCount();
+    if (user && isOnline()) flushQueue();
+  }, [user, refreshQueueCount, flushQueue]);
 
   const allTags = useMemo(() => {
     const s = new Set<string>();
@@ -159,7 +271,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       order: 0,
     };
     setState((s) => ({ ...s, tasks: [task, ...s.tasks] }));
-    if (user) withSync(() => upsertTask(task, user.id));
+    if (user) withSync(() => upsertTask(task, user.id), { kind: "upsertTask", task });
     return task;
   }, [user, withSync]);
 
@@ -177,7 +289,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     };
     setState((s) => {
       const newProj = { ...project, order: s.projects.length };
-      if (user) withSync(() => upsertProject(newProj, user.id));
+      if (user) withSync(() => upsertProject(newProj, user.id), { kind: "upsertProject", project: newProj });
       return { ...s, projects: [...s.projects, newProj] };
     });
     return project;
@@ -222,7 +334,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }));
     if (newTasks.length === 0) return;
     setState((s) => ({ ...s, tasks: [...newTasks, ...s.tasks] }));
-    if (user) withSync(() => upsertTasks(newTasks, user.id));
+    if (user) withSync(() => upsertTasks(newTasks, user.id), { kind: "upsertTasks", tasks: newTasks });
   }, [user, withSync]);
 
   const mergeImport = useCallback((newProjects: Project[], newTasks: Task[]) => {
@@ -247,14 +359,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       ...s,
       tasks: s.tasks.map((t) => (t.id === task.id ? task : t)),
     }));
-    if (user) withSync(() => upsertTask(task, user.id));
+    if (user) withSync(() => upsertTask(task, user.id), { kind: "upsertTask", task });
   }, [user, withSync]);
 
   const patchTask = useCallback((id: string, patch: Partial<Task>) => {
     setState((s) => {
       const next = s.tasks.map((t) => (t.id === id ? { ...t, ...patch } : t));
       const task = next.find((t) => t.id === id);
-      if (task && user) withSync(() => upsertTask(task, user.id));
+      if (task && user) withSync(() => upsertTask(task, user.id), { kind: "upsertTask", task });
       return { ...s, tasks: next };
     });
   }, [user, withSync]);
@@ -282,10 +394,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         };
       }
       if (user) {
-        withSync(async () => {
-          if (toggled) await upsertTask(toggled, user.id);
-          if (added) await upsertTask(added, user.id);
-        });
+        const ops: Task[] = [];
+        if (toggled) ops.push(toggled);
+        if (added) ops.push(added);
+        withSync(
+          async () => {
+            if (toggled) await upsertTask(toggled, user.id);
+            if (added) await upsertTask(added, user.id);
+          },
+          ops.length > 0 ? { kind: "upsertTasks", tasks: ops } : undefined
+        );
       }
       return added ? { ...s, tasks: [added, ...tasks] } : { ...s, tasks };
     });
@@ -293,13 +411,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const deleteTask = useCallback((id: string) => {
     setState((s) => ({ ...s, tasks: s.tasks.filter((t) => t.id !== id) }));
-    if (user) withSync(() => deleteTaskDb(id));
+    if (user) withSync(() => deleteTaskDb(id), { kind: "deleteTask", id });
   }, [user, withSync]);
 
   const deleteTasks = useCallback((ids: string[]) => {
     const set = new Set(ids);
     setState((s) => ({ ...s, tasks: s.tasks.filter((t) => !set.has(t.id)) }));
-    if (user) withSync(() => deleteTasksDb(ids));
+    if (user) withSync(() => deleteTasksDb(ids), { kind: "deleteTasks", ids });
   }, [user, withSync]);
 
   const patchTasks = useCallback((ids: string[], patch: Partial<Task>) => {
@@ -307,7 +425,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setState((s) => {
       const next = s.tasks.map((t) => (set.has(t.id) ? { ...t, ...patch } : t));
       const updated = next.filter((t) => set.has(t.id));
-      if (user && updated.length > 0) withSync(() => upsertTasks(updated, user.id));
+      if (user && updated.length > 0) withSync(() => upsertTasks(updated, user.id), { kind: "upsertTasks", tasks: updated });
       return { ...s, tasks: next };
     });
   }, [user, withSync]);
@@ -318,7 +436,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         t.id === id ? { ...t, dueDate: toISO, snoozedUntil: toISO } : t
       );
       const updated = next.find((t) => t.id === id);
-      if (updated && user) withSync(() => upsertTask(updated, user.id));
+      if (updated && user) withSync(() => upsertTask(updated, user.id), { kind: "upsertTask", task: updated });
       return { ...s, tasks: next };
     });
   }, [user, withSync]);
@@ -327,7 +445,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setState((s) => {
       const next = s.projects.map((p) => (p.id === id ? { ...p, name } : p));
       const updated = next.find((p) => p.id === id);
-      if (updated && user) withSync(() => upsertProject(updated, user.id));
+      if (updated && user) withSync(() => upsertProject(updated, user.id), { kind: "upsertProject", project: updated });
       return { ...s, projects: next };
     });
   }, [user, withSync]);
@@ -336,7 +454,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setState((s) => {
       const next = s.projects.map((p) => (p.id === id ? { ...p, color } : p));
       const updated = next.find((p) => p.id === id);
-      if (updated && user) withSync(() => upsertProject(updated, user.id));
+      if (updated && user) withSync(() => upsertProject(updated, user.id), { kind: "upsertProject", project: updated });
       return { ...s, projects: next };
     });
   }, [user, withSync]);
@@ -349,7 +467,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         t.projectId === id ? { ...t, projectId: undefined } : t
       ),
     }));
-    if (user) withSync(() => deleteProjectDb(id));
+    if (user) withSync(() => deleteProjectDb(id), { kind: "deleteProject", id });
   }, [user, withSync]);
 
   const reorderProjects = useCallback((ids: string[]) => {
@@ -379,7 +497,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const clearCompleted = useCallback(() => {
     setState((s) => {
       const toDelete = s.tasks.filter((t) => t.done).map((t) => t.id);
-      if (user && toDelete.length > 0) withSync(() => deleteTasksDb(toDelete));
+      if (user && toDelete.length > 0) withSync(() => deleteTasksDb(toDelete), { kind: "deleteTasks", ids: toDelete });
       return { ...s, tasks: s.tasks.filter((t) => !t.done) };
     });
   }, [user, withSync]);
@@ -391,6 +509,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     allTags,
     loading,
     syncing,
+    online,
+    pendingOps,
     syncError,
     addTaskFromParsed,
     addTask,

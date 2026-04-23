@@ -34,7 +34,7 @@ export default function Sidebar({
   onOpenPalette,
   onOpenSettings,
 }: Props) {
-  const { projects, tasks, allTags, addProject, deleteProject, renameProject, syncing, syncError } = useStore();
+  const { projects, tasks, allTags, addProject, deleteProject, renameProject, syncing, syncError, online, pendingOps } = useStore();
   const { user, signOut } = useAuth();
   const [newProject, setNewProject] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
@@ -312,7 +312,14 @@ export default function Sidebar({
             <span className="min-w-0 flex-1">
               <div className="truncate text-[12px] text-[var(--text)]">{user.email}</div>
               <div className="flex items-center gap-1 text-[10px] text-[var(--text-subtle)]">
-                {syncError ? (
+                {!online ? (
+                  <>
+                    <span className="h-1.5 w-1.5 rounded-full bg-orange-500" />
+                    Hors-ligne{pendingOps > 0 ? ` · ${pendingOps} en attente` : ""}
+                  </>
+                ) : syncError && pendingOps > 0 ? (
+                  <span className="text-orange-500">⟲ {pendingOps} en attente</span>
+                ) : syncError ? (
                   <span className="text-rose-500">⚠ {syncError.slice(0, 30)}</span>
                 ) : syncing ? (
                   <>
