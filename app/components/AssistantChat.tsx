@@ -75,10 +75,28 @@ function friendlyActionSummary(name: string, input: Record<string, unknown>, loo
 export default function AssistantChat({ open, onClose }: Props) {
   const store = useStore();
   const { tasks, projects } = store;
-  const [messages, setMessages] = useState<Msg[]>([]);
+  const [messages, setMessages] = useState<Msg[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const raw = localStorage.getItem("vague:chat:v1");
+      return raw ? (JSON.parse(raw) as Msg[]) : [];
+    } catch {
+      return [];
+    }
+  });
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Persist chat history
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      // Keep last 30 messages to avoid bloat
+      const trimmed = messages.slice(-30);
+      localStorage.setItem("vague:chat:v1", JSON.stringify(trimmed));
+    } catch {}
+  }, [messages]);
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -231,6 +249,9 @@ export default function AssistantChat({ open, onClose }: Props) {
     setMessages([]);
     setInput("");
     setError(null);
+    if (typeof window !== "undefined") {
+      try { localStorage.removeItem("vague:chat:v1"); } catch {}
+    }
   }
 
   if (!open) return null;

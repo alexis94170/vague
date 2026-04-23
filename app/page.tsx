@@ -14,10 +14,12 @@ import ImportDialog from "./components/ImportDialog";
 import ExportDialog from "./components/ExportDialog";
 import TodayPicker from "./components/TodayPicker";
 import TaskSkeleton from "./components/TaskSkeleton";
+import FocusMode from "./components/FocusMode";
 import SettingsDialog from "./components/SettingsDialog";
 import DailyPlan from "./components/DailyPlan";
 import AssistantChat from "./components/AssistantChat";
 import CalendarView from "./components/CalendarView";
+import AgendaView from "./components/AgendaView";
 import Dashboard from "./components/Dashboard";
 import PomodoroWidget from "./components/PomodoroWidget";
 import Notifications from "./components/Notifications";
@@ -40,6 +42,7 @@ export default function Home() {
   const { projects, tasks, loading } = useStore();
   const [view, setView] = useState<ViewKind>({ kind: "today" });
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
+  const [focusTaskId, setFocusTaskId] = useState<string | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
@@ -219,6 +222,8 @@ export default function Home() {
             />
           ) : view.kind === "calendar" ? (
             <CalendarView onOpenTask={setOpenTaskId} />
+          ) : view.kind === "agenda" ? (
+            <AgendaView onOpenTask={setOpenTaskId} />
           ) : loading && tasks.length === 0 ? (
             <TaskSkeleton rows={8} />
           ) : (
@@ -247,7 +252,15 @@ export default function Home() {
         onOpenMore={() => setSidebarOpen(true)}
       />
 
-      <TaskDrawer taskId={openTaskId} onClose={() => setOpenTaskId(null)} />
+      <TaskDrawer
+        taskId={openTaskId}
+        onClose={() => setOpenTaskId(null)}
+        onFocus={(id) => {
+          setOpenTaskId(null);
+          setFocusTaskId(id);
+        }}
+      />
+      <FocusMode taskId={focusTaskId} onClose={() => setFocusTaskId(null)} />
 
       <CommandPalette
         open={paletteOpen}

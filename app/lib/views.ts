@@ -5,6 +5,7 @@ export type ViewKind =
   | { kind: "today" }
   | { kind: "dashboard" }
   | { kind: "calendar" }
+  | { kind: "agenda" }
   | { kind: "untriaged" }
   | { kind: "all" }
   | { kind: "waiting" }
@@ -27,6 +28,8 @@ export function filterTasks(tasks: Task[], view: ViewKind): Task[] {
     case "all":
       return tasks.filter((t) => alive(t) && !t.done && excludeWaiting(t));
     case "calendar":
+      return tasks.filter((t) => alive(t) && !t.done && t.dueDate);
+    case "agenda":
       return tasks.filter((t) => alive(t) && !t.done && t.dueDate);
     case "dashboard":
       return tasks.filter(alive);
@@ -60,6 +63,7 @@ export function viewTitle(view: ViewKind, projectName?: string): string {
     case "today": return "Aujourd'hui";
     case "dashboard": return "Tableau de bord";
     case "calendar": return "Calendrier";
+    case "agenda": return "Agenda";
     case "untriaged": return "À trier";
     case "all": return "Toutes les tâches";
     case "waiting": return "En attente";

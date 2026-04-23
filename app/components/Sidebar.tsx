@@ -21,6 +21,7 @@ const VIEW_ITEMS: Array<{ kind: ViewKind["kind"]; label: string; icon: IconName 
   { kind: "dashboard", label: "Accueil", icon: "sparkles" },
   { kind: "today", label: "Aujourd'hui", icon: "sun" },
   { kind: "calendar", label: "Calendrier", icon: "calendar" },
+  { kind: "agenda", label: "Agenda", icon: "list" },
   { kind: "untriaged", label: "À trier", icon: "inbox" },
   { kind: "all", label: "Toutes", icon: "list" },
   { kind: "waiting", label: "En attente", icon: "pause" },
@@ -37,12 +38,14 @@ export default function Sidebar({
   onOpenSettings,
   onOpenTemplates,
 }: Props) {
-  const { projects, tasks, allTags, addProject, deleteProject, renameProject, syncing, syncError, online, pendingOps } = useStore();
+  const { projects, tasks, allTags, addProject, deleteProject, renameProject, reorderProjects, syncing, syncError, online, pendingOps } = useStore();
   const { user, signOut } = useAuth();
   const [newProject, setNewProject] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
 
   const counts = useMemo(() => {
     const today = todayISO();
@@ -130,6 +133,7 @@ export default function Sidebar({
               item.kind === "dashboard" ? 0 :
               item.kind === "today" ? counts.today :
               item.kind === "calendar" ? counts.calendar :
+              item.kind === "agenda" ? counts.calendar :
               item.kind === "untriaged" ? counts.untriaged :
               item.kind === "all" ? counts.all :
               item.kind === "waiting" ? counts.waiting :
@@ -193,7 +197,33 @@ export default function Sidebar({
                     />
                   </form>
                 ) : (
-                  <div className="flex items-center">
+                  <div
+                    className={`flex items-center ${dragOverId === p.id && draggedId !== p.id ? "border-t-2 border-[var(--accent)]" : ""}`}
+                    draggable={p.id !== "inbox"}
+                    onDragStart={() => setDraggedId(p.id)}
+                    onDragEnd={() => {
+                      if (draggedId && dragOverId && draggedId !== dragOverId) {
+                        const orderedIds = projects.map((pp) => pp.id);
+                        const fromIdx = orderedIds.indexOf(draggedId);
+                        const toIdx = orderedIds.indexOf(dragOverId);
+                        if (fromIdx >= 0 && toIdx >= 0) {
+                          const next = [...orderedIds];
+                          const [moved] = next.splice(fromIdx, 1);
+                          next.splice(toIdx, 0, moved);
+                          reorderProjects(next);
+                        }
+                      }
+                      setDraggedId(null);
+                      setDragOverId(null);
+                    }}
+                    onDragOver={(e) => {
+                      if (draggedId && draggedId !== p.id && p.id !== "inbox") {
+                        e.preventDefault();
+                        setDragOverId(p.id);
+                      }
+                    }}
+                    onDragLeave={() => setDragOverId((c) => (c === p.id ? null : c))}
+                  >
                     <button
                       onClick={() => onViewChange({ kind: "project", id: p.id })}
                       onDoubleClick={() => {

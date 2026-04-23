@@ -6,13 +6,15 @@ import { Priority, PRIORITY_LABEL, RecurrenceUnit, Subtask, Task } from "../lib/
 import { newId } from "../lib/storage";
 import { usePomodoro } from "../pomodoro";
 import Icon from "./Icon";
+import MarkdownPreview from "./MarkdownPreview";
 
 type Props = {
   taskId: string | null;
   onClose: () => void;
+  onFocus?: (id: string) => void;
 };
 
-export default function TaskDrawer({ taskId, onClose }: Props) {
+export default function TaskDrawer({ taskId, onClose, onFocus }: Props) {
   const { tasks, projects, patchTask, deleteTask } = useStore();
   const { start: startPomodoro } = usePomodoro();
   const task = tasks.find((t) => t.id === taskId) ?? null;
@@ -74,6 +76,16 @@ export default function TaskDrawer({ taskId, onClose }: Props) {
             Détail de la tâche
           </h2>
           <div className="flex items-center gap-1">
+            {onFocus && !draft.done && (
+              <button
+                onClick={() => onFocus(draft.id)}
+                title="Mode focus"
+                className="flex items-center gap-1 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 px-2.5 py-1 text-[11.5px] font-medium text-white shadow-sm"
+              >
+                <Icon name="sparkles" size={11} />
+                Focus
+              </button>
+            )}
             <button
               onClick={() => {
                 if (confirm("Supprimer cette tâche ?")) {
@@ -120,12 +132,9 @@ export default function TaskDrawer({ taskId, onClose }: Props) {
           </div>
 
           <div className="mt-3 ml-8">
-            <textarea
+            <NotesEditor
               value={draft.notes ?? ""}
-              onChange={(e) => save({ notes: e.target.value || undefined })}
-              placeholder="Ajouter des notes…"
-              rows={3}
-              className="w-full resize-none rounded-lg border border-transparent bg-[var(--bg)] px-3 py-2 text-[13px] leading-relaxed outline-none transition hover:border-[var(--border)] focus:border-[var(--accent)]/40"
+              onChange={(v) => save({ notes: v || undefined })}
             />
           </div>
 
@@ -331,6 +340,56 @@ export default function TaskDrawer({ taskId, onClose }: Props) {
 
 const fieldInput =
   "w-full rounded-md border border-[var(--border)] bg-[var(--bg)] px-2.5 py-1.5 text-[13px] outline-none transition hover:border-[var(--border-strong)] focus:border-[var(--accent)]/50";
+
+function NotesEditor({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [mode, setMode] = useState<"edit" | "preview">(value ? "preview" : "edit");
+  const hasContent = value.trim().length > 0;
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setMode("edit")}
+          className={`rounded-md px-2 py-0.5 text-[10.5px] font-medium transition ${
+            mode === "edit" ? "bg-[var(--bg-hover)] text-[var(--text)]" : "text-[var(--text-subtle)] hover:text-[var(--text-muted)]"
+          }`}
+        >
+          Écrire
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode("preview")}
+          disabled={!hasContent}
+          className={`rounded-md px-2 py-0.5 text-[10.5px] font-medium transition disabled:opacity-40 ${
+            mode === "preview" ? "bg-[var(--bg-hover)] text-[var(--text)]" : "text-[var(--text-subtle)] hover:text-[var(--text-muted)]"
+          }`}
+        >
+          Aperçu
+        </button>
+        <span className="ml-auto text-[10px] text-[var(--text-subtle)]">
+          **gras** *italique* `code` - liste [ ] case
+        </span>
+      </div>
+      {mode === "edit" ? (
+        <textarea
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="Ajouter des notes… (markdown supporté)"
+          rows={value ? 5 : 3}
+          className="w-full resize-none rounded-lg border border-transparent bg-[var(--bg)] px-3 py-2 font-mono text-[13px] leading-relaxed outline-none transition hover:border-[var(--border)] focus:border-[var(--accent)]/40"
+        />
+      ) : (
+        <div className="rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 py-2" onClick={() => setMode("edit")}>
+          {hasContent ? (
+            <MarkdownPreview text={value} />
+          ) : (
+            <div className="text-[12px] text-[var(--text-subtle)]">Aucune note. Clique pour écrire.</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function Field({ label, icon, children }: { label: string; icon: Parameters<typeof Icon>[0]["name"]; children: React.ReactNode }) {
   return (
