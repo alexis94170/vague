@@ -107,25 +107,35 @@ export async function aiSuggest(tasks: Task[], projects: Project[]): Promise<Sug
   return res.json();
 }
 
+export type ChatEvent =
+  | { type: "text"; text: string }
+  | { type: "tool"; id: string; name: string; input: Record<string, unknown> }
+  | { type: "done"; cost?: number }
+  | { type: "error"; error: string };
+
 export async function aiChat(
   messages: Array<{ role: "user" | "assistant"; content: string }>,
   tasks: Task[],
   projects: Project[],
-  onChunk: (text: string) => void,
+  onEvent: (event: ChatEvent) => void,
   signal?: AbortSignal
 ): Promise<void> {
   const projectsById = new Map(projects.map((p) => [p.id, p.name]));
-  const taskBrief = tasks.slice(0, 300).map((t) => ({
-    id: t.id,
-    title: t.title,
-    priority: t.priority,
-    done: t.done,
-    waiting: t.waiting,
-    waitingFor: t.waitingFor,
-    projectName: t.projectId ? projectsById.get(t.projectId) : undefined,
-    dueDate: t.dueDate,
-    tags: t.tags,
-  }));
+  const taskBrief = tasks
+    .filter((t) => !t.deletedAt)
+    .slice(0, 300)
+    .map((t) => ({
+      id: t.id,
+      title: t.title,
+      priority: t.priority,
+      done: t.done,
+      waiting: t.waiting,
+      waitingFor: t.waitingFor,
+      projectId: t.projectId,
+      projectName: t.projectId ? projectsById.get(t.projectId) : undefined,
+      dueDate: t.dueDate,
+      tags: t.tags,
+    }));
 
   const res = await fetch("/api/ai/chat", {
     method: "POST",
@@ -133,6 +143,7 @@ export async function aiChat(
     body: JSON.stringify({
       messages,
       tasks: taskBrief,
+      projects: projects.filter((p) => p.id !== "inbox").map((p) => ({ id: p.id, name: p.name })),
       today: todayISO(),
     }),
     signal,
@@ -143,9 +154,21 @@ export async function aiChat(
   }
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
+  let buf = "";
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
-    onChunk(decoder.decode(value, { stream: true }));
+    buf += decoder.decode(value, { stream: true });
+    const lines = buf.split("\n");
+    buf = lines.pop() ?? "";
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      try {
+        onEvent(JSON.parse(line) as ChatEvent);
+      } catch {}
+    }
+  }
+  if (buf.trim()) {
+    try { onEvent(JSON.parse(buf) as ChatEvent); } catch {}
   }
 }

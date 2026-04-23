@@ -38,7 +38,25 @@ export type Task = {
   snoozedUntil?: string;
   waiting?: boolean;
   waitingFor?: string;
+  deletedAt?: string;
   createdAt: string;
+  order: number;
+};
+
+export type TaskTemplateItem = {
+  title: string;
+  priority?: Priority;
+  tags?: string[];
+  estimateMinutes?: number;
+  notes?: string;
+};
+
+export type TaskTemplate = {
+  id: string;
+  name: string;
+  icon?: string;
+  color: string;
+  items: TaskTemplateItem[];
   order: number;
 };
 

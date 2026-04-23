@@ -7,6 +7,7 @@ import { StoreProvider } from "./store";
 import { ThemeProvider } from "./theme";
 import { PomodoroProvider } from "./pomodoro";
 import ServiceWorkerRegister from "./components/ServiceWorkerRegister";
+import { ToastProvider } from "./toast";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
@@ -65,13 +66,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="min-h-full bg-[var(--bg)] text-[var(--text)]">
         <ThemeProvider>
-          <AuthProvider>
-            <AuthGate>
-              <StoreProvider>
-                <PomodoroProvider>{children}</PomodoroProvider>
-              </StoreProvider>
-            </AuthGate>
-          </AuthProvider>
+          <ToastProvider>
+            <AuthProvider>
+              <AuthGate>
+                <StoreProvider>
+                  <PomodoroProvider>{children}</PomodoroProvider>
+                </StoreProvider>
+              </AuthGate>
+            </AuthProvider>
+          </ToastProvider>
         </ThemeProvider>
         <ServiceWorkerRegister />
       </body>

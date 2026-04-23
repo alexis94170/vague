@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useStore } from "../store";
+import { useToast } from "../toast";
 import { filterTasks, ViewKind } from "../lib/views";
 import { PRIORITY_ORDER, Task, Priority } from "../lib/types";
 import { todayISO, addDays } from "../lib/dates";
@@ -58,8 +59,10 @@ function sortTasks(tasks: Task[]): Task[] {
 }
 
 export default function TaskList({ view, onOpenTask }: Props) {
-  const { tasks, projects, patchTasks, deleteTasks, snoozeTask, clearCompleted } = useStore();
+  const { tasks, projects, patchTasks, deleteTasks, restoreTasks, hardDeleteTasks, emptyTrash, snoozeTask, clearCompleted } = useStore();
+  const toast = useToast();
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const isTrash = view.kind === "trash";
 
   const filtered = useMemo(() => filterTasks(tasks, view), [tasks, view]);
 
@@ -85,6 +88,12 @@ export default function TaskList({ view, onOpenTask }: Props) {
     if (view.kind === "completed") {
       const sorted = [...filtered].sort((a, b) =>
         (b.doneAt ?? "").localeCompare(a.doneAt ?? "")
+      );
+      return [{ label: "", tasks: sorted }];
+    }
+    if (view.kind === "trash") {
+      const sorted = [...filtered].sort((a, b) =>
+        (b.deletedAt ?? "").localeCompare(a.deletedAt ?? "")
       );
       return [{ label: "", tasks: sorted }];
     }
@@ -140,10 +149,13 @@ export default function TaskList({ view, onOpenTask }: Props) {
             }}
             onResume={() => patchTasks(selectedIds, { waiting: false, waitingFor: undefined })}
             onDelete={() => {
-              if (confirm(`Supprimer ${selectedIds.length} tâche(s) ?`)) {
-                deleteTasks(selectedIds);
-                clearSelection();
-              }
+              const ids = [...selectedIds];
+              deleteTasks(ids);
+              clearSelection();
+              toast.show({
+                message: `${ids.length} tâche${ids.length > 1 ? "s déplacées" : " déplacée"} vers la corbeille`,
+                action: { label: "Annuler", onClick: () => restoreTasks(ids) },
+              });
             }}
             projects={projects}
           />
@@ -173,6 +185,38 @@ export default function TaskList({ view, onOpenTask }: Props) {
         </div>
       )}
 
+      {isTrash && (
+        <div className="flex flex-wrap items-center gap-2 border-b border-[var(--border)] bg-[var(--bg)] px-4 py-2.5 text-[12px]">
+          <span className="text-[var(--text-muted)]">
+            {filtered.length === 0 ? "Corbeille vide" : `${filtered.length} tâche${filtered.length > 1 ? "s" : ""} supprimée${filtered.length > 1 ? "s" : ""}`} · suppression définitive après 30 jours
+          </span>
+          {filtered.length > 0 && (
+            <>
+              <button
+                onClick={() => {
+                  const ids = filtered.map((t) => t.id);
+                  restoreTasks(ids);
+                  toast.show({ message: `${ids.length} tâche${ids.length > 1 ? "s restaurées" : " restaurée"}`, tone: "success" });
+                }}
+                className="ml-auto rounded-md border border-[var(--border)] bg-[var(--bg-elev)] px-2.5 py-1 text-[11.5px] font-medium text-[var(--text-muted)] hover:text-[var(--text)]"
+              >
+                Tout restaurer
+              </button>
+              <button
+                onClick={() => {
+                  if (confirm(`Vider définitivement la corbeille (${filtered.length} tâche${filtered.length > 1 ? "s" : ""}) ? Cette action est irréversible.`)) {
+                    emptyTrash();
+                  }
+                }}
+                className="rounded-md border border-rose-300 bg-rose-50 px-2.5 py-1 text-[11.5px] font-medium text-rose-700 hover:bg-rose-100 dark:border-rose-900/50 dark:bg-rose-900/30 dark:text-rose-300"
+              >
+                Vider la corbeille
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
       {isEmpty ? (
         <EmptyState view={view} totalTasks={tasks.length} />
       ) : (
@@ -195,6 +239,14 @@ export default function TaskList({ view, onOpenTask }: Props) {
                     selected={selected.has(t.id)}
                     onToggleSelect={toggleSelect}
                     onOpen={onOpenTask}
+                    trashMode={isTrash}
+                    onRestore={() => {
+                      restoreTasks([t.id]);
+                      toast.show({ message: `« ${t.title.slice(0, 40)} » restaurée`, tone: "success" });
+                    }}
+                    onHardDelete={() => {
+                      if (confirm("Supprimer définitivement cette tâche ?")) hardDeleteTasks([t.id]);
+                    }}
                   />
                 ))}
               </div>

@@ -13,6 +13,9 @@ type Props = {
   selected: boolean;
   onToggleSelect: (id: string, shift: boolean) => void;
   onOpen: (id: string) => void;
+  trashMode?: boolean;
+  onRestore?: () => void;
+  onHardDelete?: () => void;
 };
 
 const PRIORITY_ACCENT: Record<string, string> = {
@@ -34,7 +37,7 @@ const PRIORITY_CHECKBOX: Record<string, string> = {
 const SWIPE_THRESHOLD = 70;
 const SWIPE_MAX = 120;
 
-export default function TaskRow({ task, selected, onToggleSelect, onOpen }: Props) {
+export default function TaskRow({ task, selected, onToggleSelect, onOpen, trashMode, onRestore, onHardDelete }: Props) {
   const { projects, toggleDone, patchTask, deleteTask } = useStore();
   const project = projects.find((p) => p.id === task.projectId);
   const due = formatDueLabel(task.dueDate);
@@ -226,8 +229,31 @@ export default function TaskRow({ task, selected, onToggleSelect, onOpen }: Prop
           )}
         </button>
 
+        {/* Trash actions */}
+        {trashMode && (
+          <div className="flex shrink-0 items-center gap-1">
+            <button
+              onClick={(e) => { e.stopPropagation(); onRestore?.(); }}
+              title="Restaurer"
+              className="rounded-lg border border-[var(--border)] bg-[var(--bg-elev)] px-2 py-1 text-[11px] font-medium text-[var(--text-muted)] hover:border-emerald-400/50 hover:text-emerald-600"
+            >
+              <span className="flex items-center gap-1">
+                <Icon name="repeat" size={11} />
+                Restaurer
+              </span>
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); onHardDelete?.(); }}
+              title="Supprimer définitivement"
+              className="rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-[11px] font-medium text-rose-700 hover:bg-rose-100 dark:border-rose-900/50 dark:bg-rose-900/30 dark:text-rose-300"
+            >
+              <Icon name="trash" size={11} />
+            </button>
+          </div>
+        )}
+
         {/* Desktop hover actions */}
-        {!task.done && (
+        {!task.done && !trashMode && (
           <div className="invisible absolute right-3 top-1/2 hidden -translate-y-1/2 items-center gap-1 group-hover:visible md:flex">
             {!isToday && !task.waiting && (
               <button

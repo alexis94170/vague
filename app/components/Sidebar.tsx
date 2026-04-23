@@ -24,6 +24,7 @@ const VIEW_ITEMS: Array<{ kind: ViewKind["kind"]; label: string; icon: IconName 
   { kind: "all", label: "Toutes", icon: "list" },
   { kind: "waiting", label: "En attente", icon: "pause" },
   { kind: "completed", label: "Terminées", icon: "check" },
+  { kind: "trash", label: "Corbeille", icon: "trash" },
 ];
 
 export default function Sidebar({
@@ -51,10 +52,15 @@ export default function Sidebar({
       all: 0,
       waiting: 0,
       completed: 0,
+      trash: 0,
       byProject: new Map<string, number>(),
       byTag: new Map<string, number>(),
     };
     tasks.forEach((t) => {
+      if (t.deletedAt) {
+        c.trash++;
+        return;
+      }
       if (t.done) {
         c.completed++;
         return;
@@ -125,6 +131,7 @@ export default function Sidebar({
               item.kind === "untriaged" ? counts.untriaged :
               item.kind === "all" ? counts.all :
               item.kind === "waiting" ? counts.waiting :
+              item.kind === "trash" ? counts.trash :
               counts.completed;
             const active = isActive({ kind: item.kind } as ViewKind);
             return (

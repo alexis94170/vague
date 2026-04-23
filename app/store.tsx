@@ -26,6 +26,10 @@ import {
   deleteTaskDb,
   deleteTasksDb,
   fetchAll,
+  restoreTask as restoreTaskDb,
+  restoreTasks as restoreTasksDb,
+  softDeleteTask,
+  softDeleteTasks,
   upsertProject,
   upsertTask,
   upsertTasks,
@@ -61,6 +65,11 @@ type Ctx = {
   toggleDone: (id: string) => void;
   deleteTask: (id: string) => void;
   deleteTasks: (ids: string[]) => void;
+  hardDeleteTask: (id: string) => void;
+  hardDeleteTasks: (ids: string[]) => void;
+  restoreTask: (id: string) => void;
+  restoreTasks: (ids: string[]) => void;
+  emptyTrash: () => void;
   patchTasks: (ids: string[], patch: Partial<Task>) => void;
   snoozeTask: (id: string, toISO: string) => void;
   addProject: (name: string) => Project;
@@ -409,15 +418,61 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     });
   }, [user, withSync]);
 
+  // Soft delete (default) — task goes to trash, restorable for 30 days
   const deleteTask = useCallback((id: string) => {
-    setState((s) => ({ ...s, tasks: s.tasks.filter((t) => t.id !== id) }));
-    if (user) withSync(() => deleteTaskDb(id), { kind: "deleteTask", id });
+    const now = new Date().toISOString();
+    setState((s) => ({
+      ...s,
+      tasks: s.tasks.map((t) => (t.id === id ? { ...t, deletedAt: now } : t)),
+    }));
+    if (user) withSync(() => softDeleteTask(id));
   }, [user, withSync]);
 
   const deleteTasks = useCallback((ids: string[]) => {
     const set = new Set(ids);
+    const now = new Date().toISOString();
+    setState((s) => ({
+      ...s,
+      tasks: s.tasks.map((t) => (set.has(t.id) ? { ...t, deletedAt: now } : t)),
+    }));
+    if (user) withSync(() => softDeleteTasks(ids));
+  }, [user, withSync]);
+
+  // Hard delete (permanent) — used in trash view and cleanup
+  const hardDeleteTask = useCallback((id: string) => {
+    setState((s) => ({ ...s, tasks: s.tasks.filter((t) => t.id !== id) }));
+    if (user) withSync(() => deleteTaskDb(id), { kind: "deleteTask", id });
+  }, [user, withSync]);
+
+  const hardDeleteTasks = useCallback((ids: string[]) => {
+    const set = new Set(ids);
     setState((s) => ({ ...s, tasks: s.tasks.filter((t) => !set.has(t.id)) }));
     if (user) withSync(() => deleteTasksDb(ids), { kind: "deleteTasks", ids });
+  }, [user, withSync]);
+
+  const restoreTask = useCallback((id: string) => {
+    setState((s) => ({
+      ...s,
+      tasks: s.tasks.map((t) => (t.id === id ? { ...t, deletedAt: undefined } : t)),
+    }));
+    if (user) withSync(() => restoreTaskDb(id));
+  }, [user, withSync]);
+
+  const restoreTasks = useCallback((ids: string[]) => {
+    const set = new Set(ids);
+    setState((s) => ({
+      ...s,
+      tasks: s.tasks.map((t) => (set.has(t.id) ? { ...t, deletedAt: undefined } : t)),
+    }));
+    if (user) withSync(() => restoreTasksDb(ids));
+  }, [user, withSync]);
+
+  const emptyTrash = useCallback(() => {
+    setState((s) => {
+      const toDelete = s.tasks.filter((t) => t.deletedAt).map((t) => t.id);
+      if (user && toDelete.length > 0) withSync(() => deleteTasksDb(toDelete));
+      return { ...s, tasks: s.tasks.filter((t) => !t.deletedAt) };
+    });
   }, [user, withSync]);
 
   const patchTasks = useCallback((ids: string[], patch: Partial<Task>) => {
@@ -521,6 +576,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     toggleDone,
     deleteTask,
     deleteTasks,
+    hardDeleteTask,
+    hardDeleteTasks,
+    restoreTask,
+    restoreTasks,
+    emptyTrash,
     patchTasks,
     snoozeTask,
     addProject,

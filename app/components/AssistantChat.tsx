@@ -2,11 +2,16 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useStore } from "../store";
-import { aiChat } from "../lib/ai-client";
+import { aiChat, ChatEvent } from "../lib/ai-client";
 import { haptic } from "../lib/haptics";
+import { Priority, Task } from "../lib/types";
 import Icon from "./Icon";
 
-type Msg = { role: "user" | "assistant"; content: string };
+type Msg = {
+  role: "user" | "assistant";
+  content: string;
+  actions?: Array<{ name: string; summary: string }>;
+};
 
 type Props = {
   open: boolean;
@@ -16,12 +21,44 @@ type Props = {
 const SUGGESTIONS = [
   "Qu'est-ce que je fais en priorité aujourd'hui ?",
   "Quelles tâches sont en retard ?",
-  "Regroupe mes tâches Indiana Café par urgence",
-  "Quelles tâches attendent un retour externe ?",
+  "Ajoute « commander du papier toilette » en urgent pour Indiana Café",
+  "Reporte toutes mes tâches basses à la semaine prochaine",
 ];
 
+function friendlyActionSummary(name: string, input: Record<string, unknown>, lookup: (id: string) => string | undefined): string {
+  switch (name) {
+    case "create_task": {
+      const title = String(input.title ?? "");
+      const prio = input.priority && input.priority !== "none" ? ` (${input.priority})` : "";
+      return `➕ Tâche créée · « ${title} »${prio}`;
+    }
+    case "update_task": {
+      const title = lookup(String(input.taskId ?? "")) ?? "tâche";
+      return `✎ Modifiée · « ${title} »`;
+    }
+    case "complete_tasks": {
+      const ids = (input.taskIds as string[]) ?? [];
+      if (ids.length === 1) return `✓ Terminée · « ${lookup(ids[0]) ?? "tâche"} »`;
+      return `✓ ${ids.length} tâches terminées`;
+    }
+    case "delete_tasks": {
+      const ids = (input.taskIds as string[]) ?? [];
+      if (ids.length === 1) return `🗑 Supprimée · « ${lookup(ids[0]) ?? "tâche"} » (dans la corbeille)`;
+      return `🗑 ${ids.length} tâches supprimées (dans la corbeille)`;
+    }
+    case "reschedule_tasks": {
+      const ids = (input.taskIds as string[]) ?? [];
+      const date = String(input.dueDate ?? "");
+      if (ids.length === 1) return `📅 « ${lookup(ids[0]) ?? "tâche"} » → ${date}`;
+      return `📅 ${ids.length} tâches reportées au ${date}`;
+    }
+  }
+  return `Action : ${name}`;
+}
+
 export default function AssistantChat({ open, onClose }: Props) {
-  const { tasks, projects } = useStore();
+  const store = useStore();
+  const { tasks, projects } = store;
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -30,26 +67,71 @@ export default function AssistantChat({ open, onClose }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  useEffect(() => {
-    if (open) setTimeout(() => inputRef.current?.focus(), 100);
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) {
-      abortRef.current?.abort();
-    }
-  }, [open]);
-
+  useEffect(() => { if (open) setTimeout(() => inputRef.current?.focus(), 100); }, [open]);
+  useEffect(() => { if (!open) abortRef.current?.abort(); }, [open]);
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages]);
+
+  function titleLookup(id: string): string | undefined {
+    return tasks.find((t) => t.id === id)?.title;
+  }
+
+  function executeTool(name: string, input: Record<string, unknown>): boolean {
+    try {
+      switch (name) {
+        case "create_task": {
+          store.addTask({
+            title: String(input.title ?? "Sans titre"),
+            priority: (input.priority as Priority | undefined) ?? "none",
+            projectId: input.projectId ? String(input.projectId) : undefined,
+            tags: (input.tags as string[] | undefined) ?? [],
+            dueDate: input.dueDate ? String(input.dueDate) : undefined,
+            dueTime: input.dueTime ? String(input.dueTime) : undefined,
+            estimateMinutes: input.estimateMinutes ? Number(input.estimateMinutes) : undefined,
+            notes: input.notes ? String(input.notes) : undefined,
+          });
+          return true;
+        }
+        case "update_task": {
+          const id = String(input.taskId ?? "");
+          const patch = (input.patch as Partial<Task>) ?? {};
+          if (!id) return false;
+          store.patchTask(id, patch);
+          return true;
+        }
+        case "complete_tasks": {
+          const ids = (input.taskIds as string[]) ?? [];
+          ids.forEach((id) => {
+            const t = tasks.find((x) => x.id === id);
+            if (t && !t.done) store.toggleDone(id);
+          });
+          return true;
+        }
+        case "delete_tasks": {
+          const ids = (input.taskIds as string[]) ?? [];
+          if (ids.length > 0) store.deleteTasks(ids);
+          return true;
+        }
+        case "reschedule_tasks": {
+          const ids = (input.taskIds as string[]) ?? [];
+          const date = String(input.dueDate ?? "");
+          if (ids.length > 0 && date) store.patchTasks(ids, { dueDate: date });
+          return true;
+        }
+      }
+    } catch (e) {
+      console.error("tool exec failed:", e);
+    }
+    return false;
+  }
 
   async function send(text: string) {
     const content = text.trim();
     if (!content || loading) return;
     const userMsg: Msg = { role: "user", content };
-    const newMessages = [...messages, userMsg, { role: "assistant" as const, content: "" }];
-    setMessages(newMessages);
+    const assistantMsg: Msg = { role: "assistant", content: "", actions: [] };
+    setMessages((prev) => [...prev, userMsg, assistantMsg]);
     setInput("");
     setError(null);
     setLoading(true);
@@ -63,13 +145,26 @@ export default function AssistantChat({ open, onClose }: Props) {
         [...messages, userMsg],
         tasks,
         projects,
-        (chunk) => {
+        (event: ChatEvent) => {
           setMessages((prev) => {
             const next = [...prev];
-            next[next.length - 1] = {
-              role: "assistant",
-              content: next[next.length - 1].content + chunk,
-            };
+            const last = next[next.length - 1];
+            if (last.role !== "assistant") return prev;
+            if (event.type === "text") {
+              next[next.length - 1] = { ...last, content: last.content + event.text };
+            } else if (event.type === "tool") {
+              const ok = executeTool(event.name, event.input);
+              if (ok) {
+                haptic("success");
+                const summary = friendlyActionSummary(event.name, event.input, titleLookup);
+                next[next.length - 1] = {
+                  ...last,
+                  actions: [...(last.actions ?? []), { name: event.name, summary }],
+                };
+              }
+            } else if (event.type === "error") {
+              next[next.length - 1] = { ...last, content: last.content + `\n⚠ ${event.error}` };
+            }
             return next;
           });
         },
@@ -107,7 +202,7 @@ export default function AssistantChat({ open, onClose }: Props) {
             </span>
             <div>
               <h2 className="text-[15px] font-semibold leading-tight">Assistant Vague</h2>
-              <div className="text-[11px] text-[var(--text-muted)]">Je connais tes {tasks.length} tâches</div>
+              <div className="text-[11px] text-[var(--text-muted)]">Peut créer, cocher, reporter tes tâches directement</div>
             </div>
           </div>
           <div className="flex items-center gap-1">
@@ -125,7 +220,7 @@ export default function AssistantChat({ open, onClose }: Props) {
             <div className="space-y-4">
               <div className="rounded-xl border border-[var(--border)] bg-[var(--bg)] p-4">
                 <div className="text-[13px] text-[var(--text-muted)]">
-                  Je peux t&apos;aider à organiser, prioriser, ou analyser tes tâches. Essaie une de ces questions :
+                  Je peux maintenant <strong className="text-[var(--text)]">agir</strong> sur tes tâches. Demande-moi d&apos;ajouter, cocher, reporter, supprimer — c&apos;est fait.
                 </div>
               </div>
               <div className="space-y-2">
@@ -144,22 +239,39 @@ export default function AssistantChat({ open, onClose }: Props) {
           ) : (
             <div className="space-y-4">
               {messages.map((m, i) => (
-                <div
-                  key={i}
-                  className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
-                >
-                  <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-[14px] leading-relaxed ${
-                    m.role === "user"
-                      ? "bg-[var(--accent)] text-white"
-                      : "bg-[var(--bg)] text-[var(--text)]"
-                  }`}>
-                    {m.content || (loading && i === messages.length - 1 ? (
-                      <span className="inline-flex items-center gap-1">
-                        <span className="h-2 w-2 animate-pulse rounded-full bg-current opacity-50" />
-                        <span className="h-2 w-2 animate-pulse rounded-full bg-current opacity-50" style={{ animationDelay: "150ms" }} />
-                        <span className="h-2 w-2 animate-pulse rounded-full bg-current opacity-50" style={{ animationDelay: "300ms" }} />
-                      </span>
-                    ) : "")}
+                <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+                  <div className={`max-w-[85%] flex-col gap-1 ${m.role === "user" ? "items-end" : "items-start"}`}>
+                    {m.content && (
+                      <div className={`rounded-2xl px-4 py-2.5 text-[14px] leading-relaxed ${
+                        m.role === "user" ? "bg-[var(--accent)] text-white" : "bg-[var(--bg)] text-[var(--text)]"
+                      }`}>
+                        {m.content || (loading && i === messages.length - 1 ? (
+                          <span className="inline-flex items-center gap-1">
+                            <span className="h-2 w-2 animate-pulse rounded-full bg-current opacity-50" />
+                            <span className="h-2 w-2 animate-pulse rounded-full bg-current opacity-50" style={{ animationDelay: "150ms" }} />
+                            <span className="h-2 w-2 animate-pulse rounded-full bg-current opacity-50" style={{ animationDelay: "300ms" }} />
+                          </span>
+                        ) : "")}
+                      </div>
+                    )}
+                    {!m.content && loading && i === messages.length - 1 && (!m.actions || m.actions.length === 0) && (
+                      <div className="rounded-2xl bg-[var(--bg)] px-4 py-2.5 text-[14px]">
+                        <span className="inline-flex items-center gap-1">
+                          <span className="h-2 w-2 animate-pulse rounded-full bg-current opacity-50" />
+                          <span className="h-2 w-2 animate-pulse rounded-full bg-current opacity-50" style={{ animationDelay: "150ms" }} />
+                          <span className="h-2 w-2 animate-pulse rounded-full bg-current opacity-50" style={{ animationDelay: "300ms" }} />
+                        </span>
+                      </div>
+                    )}
+                    {m.actions && m.actions.length > 0 && (
+                      <div className="space-y-1">
+                        {m.actions.map((a, j) => (
+                          <div key={j} className="rounded-full border border-[var(--accent)]/30 bg-[var(--accent-soft)] px-3 py-1 text-[11.5px] font-medium text-[var(--accent)]">
+                            {a.summary}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -191,7 +303,7 @@ export default function AssistantChat({ open, onClose }: Props) {
                 }
               }}
               rows={1}
-              placeholder="Demande-moi quelque chose…"
+              placeholder="Dis-moi ce qu'il faut faire…"
               className="flex-1 resize-none rounded-xl border border-[var(--border)] bg-[var(--bg-elev)] px-3 py-2.5 text-[14px] outline-none focus:border-[var(--accent)]/40"
               style={{ maxHeight: 120 }}
             />

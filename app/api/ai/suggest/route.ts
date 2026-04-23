@@ -1,4 +1,5 @@
 import { anthropic, CHAT_MODEL, handleAnthropicError, hasApiKey } from "../../../lib/ai-shared";
+import { checkDailyBudget, checkRateLimit, estimateCost, recordSpend } from "../../../lib/ai-ratelimit";
 
 export const runtime = "nodejs";
 
@@ -67,6 +68,14 @@ const SUGGEST_TOOL = {
 export async function POST(req: Request) {
   if (!hasApiKey()) {
     return Response.json({ error: "ANTHROPIC_API_KEY non configurée." }, { status: 501 });
+  }
+  const rl = checkRateLimit("suggest", req.headers);
+  if (!rl.ok) {
+    return Response.json({ error: `Trop de requêtes. Réessaie dans ${Math.ceil(rl.retryAfter / 60)} minutes.` }, { status: 429, headers: { "Retry-After": String(rl.retryAfter) } });
+  }
+  const budget = checkDailyBudget(req.headers);
+  if (!budget.ok) {
+    return Response.json({ error: `Budget IA quotidien atteint (${budget.current.toFixed(3)}$). Reset à minuit UTC.` }, { status: 429 });
   }
   let body: SuggestInput;
   try {
@@ -141,7 +150,14 @@ Analyse et propose 3-5 suggestions actionables pour m'aider à avancer.`;
       .map((s) => ({ ...s, taskIds: s.taskIds.filter((id) => validIds.has(id)) }))
       .filter((s) => s.taskIds.length > 0 || s.action === "none");
 
-    return Response.json(out);
+    const cost = estimateCost(CHAT_MODEL, {
+      input: response.usage.input_tokens,
+      output: response.usage.output_tokens,
+      cacheRead: response.usage.cache_read_input_tokens ?? 0,
+      cacheWrite: response.usage.cache_creation_input_tokens ?? 0,
+    });
+    recordSpend(req.headers, cost);
+    return Response.json({ ...out, cost });
   } catch (err) {
     return handleAnthropicError(err);
   }

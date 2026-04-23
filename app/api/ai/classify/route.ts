@@ -1,4 +1,5 @@
 import { anthropic, CLASSIFY_MODEL, handleAnthropicError, hasApiKey } from "../../../lib/ai-shared";
+import { checkDailyBudget, checkRateLimit, estimateCost, recordSpend } from "../../../lib/ai-ratelimit";
 
 export const runtime = "nodejs";
 
@@ -55,6 +56,14 @@ export async function POST(req: Request) {
   if (!hasApiKey()) {
     return Response.json({ error: "ANTHROPIC_API_KEY non configurée côté serveur." }, { status: 501 });
   }
+  const rl = checkRateLimit("classify", req.headers);
+  if (!rl.ok) {
+    return Response.json({ error: `Trop de requêtes. Réessaie dans ${Math.ceil(rl.retryAfter / 60)} minutes.` }, { status: 429, headers: { "Retry-After": String(rl.retryAfter) } });
+  }
+  const budget = checkDailyBudget(req.headers);
+  if (!budget.ok) {
+    return Response.json({ error: `Budget IA quotidien atteint (${budget.current.toFixed(3)}$). Reset à minuit UTC.` }, { status: 429 });
+  }
 
   let body: ClassifyInput;
   try {
@@ -107,15 +116,15 @@ Règles :
     if (out.projectId && !body.projects.find((p) => p.id === out.projectId)) {
       out.projectId = null;
     }
-    return Response.json({
-      ...out,
-      usage: {
-        input: response.usage.input_tokens,
-        output: response.usage.output_tokens,
-        cacheRead: response.usage.cache_read_input_tokens ?? 0,
-        cacheWrite: response.usage.cache_creation_input_tokens ?? 0,
-      },
-    });
+    const usage = {
+      input: response.usage.input_tokens,
+      output: response.usage.output_tokens,
+      cacheRead: response.usage.cache_read_input_tokens ?? 0,
+      cacheWrite: response.usage.cache_creation_input_tokens ?? 0,
+    };
+    const cost = estimateCost(CLASSIFY_MODEL, usage);
+    recordSpend(req.headers, cost);
+    return Response.json({ ...out, usage: { ...usage, cost } });
   } catch (err) {
     return handleAnthropicError(err);
   }

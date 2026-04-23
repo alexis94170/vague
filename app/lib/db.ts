@@ -1,6 +1,6 @@
 "use client";
 
-import { AppState, Project, Task, Priority, Subtask, Recurrence } from "./types";
+import { AppState, Project, Task, Priority, Subtask, Recurrence, TaskTemplate, TaskTemplateItem } from "./types";
 import { supabase } from "./supabase";
 
 type DbProject = {
@@ -31,6 +31,7 @@ type DbTask = {
   snoozed_until: string | null;
   waiting: boolean;
   waiting_for: string | null;
+  deleted_at: string | null;
   order_index: number;
   created_at: string;
   updated_at: string;
@@ -58,6 +59,7 @@ function taskFromDb(r: DbTask): Task {
     snoozedUntil: r.snoozed_until ?? undefined,
     waiting: r.waiting ?? false,
     waitingFor: r.waiting_for ?? undefined,
+    deletedAt: r.deleted_at ?? undefined,
     order: r.order_index,
     createdAt: r.created_at,
   };
@@ -92,8 +94,109 @@ function taskToDb(t: Task, userId: string) {
     snoozed_until: t.snoozedUntil || null,
     waiting: t.waiting ?? false,
     waiting_for: t.waitingFor || null,
+    deleted_at: t.deletedAt || null,
     order_index: t.order ?? 0,
   };
+}
+
+/* ==================== Templates ==================== */
+
+type DbTemplate = {
+  id: string;
+  user_id: string;
+  name: string;
+  icon: string | null;
+  color: string;
+  items: TaskTemplateItem[];
+  order_index: number;
+};
+
+function templateFromDb(r: DbTemplate): TaskTemplate {
+  return {
+    id: r.id,
+    name: r.name,
+    icon: r.icon ?? undefined,
+    color: r.color,
+    items: r.items ?? [],
+    order: r.order_index,
+  };
+}
+
+function templateToDb(t: TaskTemplate, userId: string) {
+  return {
+    id: t.id,
+    user_id: userId,
+    name: t.name,
+    icon: t.icon || null,
+    color: t.color,
+    items: t.items,
+    order_index: t.order ?? 0,
+  };
+}
+
+export async function fetchTemplates(userId: string): Promise<TaskTemplate[]> {
+  const { data, error } = await supabase()
+    .from("task_templates")
+    .select("*")
+    .eq("user_id", userId)
+    .order("order_index");
+  if (error) throw error;
+  return (data ?? []).map(templateFromDb);
+}
+
+export async function upsertTemplateDb(t: TaskTemplate, userId: string) {
+  const { error } = await supabase().from("task_templates").upsert(templateToDb(t, userId));
+  if (error) throw error;
+}
+
+export async function deleteTemplateDb(id: string) {
+  const { error } = await supabase().from("task_templates").delete().eq("id", id);
+  if (error) throw error;
+}
+
+/* ==================== AI usage ==================== */
+
+export async function logAiUsage(userId: string, entry: {
+  endpoint: string;
+  model: string;
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
+  cost: number;
+}) {
+  await supabase().from("ai_usage").insert({
+    user_id: userId,
+    endpoint: entry.endpoint,
+    model: entry.model,
+    input_tokens: entry.input,
+    output_tokens: entry.output,
+    cache_read_tokens: entry.cacheRead,
+    cache_write_tokens: entry.cacheWrite,
+    cost_usd: entry.cost,
+  });
+}
+
+export async function fetchAiUsageSince(userId: string, sinceISO: string): Promise<{
+  total_cost: number;
+  by_endpoint: Record<string, { count: number; cost: number }>;
+}> {
+  const { data, error } = await supabase()
+    .from("ai_usage")
+    .select("endpoint, cost_usd")
+    .eq("user_id", userId)
+    .gte("created_at", sinceISO);
+  if (error) throw error;
+  const by: Record<string, { count: number; cost: number }> = {};
+  let total = 0;
+  (data ?? []).forEach((row: { endpoint: string; cost_usd: number }) => {
+    const c = Number(row.cost_usd);
+    total += c;
+    by[row.endpoint] ??= { count: 0, cost: 0 };
+    by[row.endpoint].count += 1;
+    by[row.endpoint].cost += c;
+  });
+  return { total_cost: total, by_endpoint: by };
 }
 
 export async function fetchAll(userId: string): Promise<AppState> {
@@ -110,6 +213,41 @@ export async function fetchAll(userId: string): Promise<AppState> {
     tasks: (tasks ?? []).map(taskFromDb),
     settings: { theme: "system" },
   };
+}
+
+// Soft-delete: set deleted_at instead of removing
+export async function softDeleteTask(id: string) {
+  const { error } = await supabase()
+    .from("tasks")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) throw error;
+}
+
+export async function softDeleteTasks(ids: string[]) {
+  if (ids.length === 0) return;
+  const { error } = await supabase()
+    .from("tasks")
+    .update({ deleted_at: new Date().toISOString() })
+    .in("id", ids);
+  if (error) throw error;
+}
+
+export async function restoreTask(id: string) {
+  const { error } = await supabase()
+    .from("tasks")
+    .update({ deleted_at: null })
+    .eq("id", id);
+  if (error) throw error;
+}
+
+export async function restoreTasks(ids: string[]) {
+  if (ids.length === 0) return;
+  const { error } = await supabase()
+    .from("tasks")
+    .update({ deleted_at: null })
+    .in("id", ids);
+  if (error) throw error;
 }
 
 export async function upsertProject(p: Project, userId: string) {

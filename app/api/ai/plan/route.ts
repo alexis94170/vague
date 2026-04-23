@@ -1,4 +1,5 @@
 import { anthropic, CHAT_MODEL, handleAnthropicError, hasApiKey } from "../../../lib/ai-shared";
+import { checkDailyBudget, checkRateLimit, estimateCost, recordSpend } from "../../../lib/ai-ratelimit";
 
 export const runtime = "nodejs";
 
@@ -49,6 +50,14 @@ const PLAN_TOOL = {
 export async function POST(req: Request) {
   if (!hasApiKey()) {
     return Response.json({ error: "ANTHROPIC_API_KEY non configurée côté serveur." }, { status: 501 });
+  }
+  const rl = checkRateLimit("plan", req.headers);
+  if (!rl.ok) {
+    return Response.json({ error: `Trop de requêtes. Réessaie dans ${Math.ceil(rl.retryAfter / 60)} minutes.` }, { status: 429, headers: { "Retry-After": String(rl.retryAfter) } });
+  }
+  const budget = checkDailyBudget(req.headers);
+  if (!budget.ok) {
+    return Response.json({ error: `Budget IA quotidien atteint (${budget.current.toFixed(3)}$). Reset à minuit UTC.` }, { status: 429 });
   }
 
   let body: PlanInput;
@@ -118,15 +127,15 @@ Propose 5-7 tâches à traiter aujourd'hui.`;
     // Filter to only valid IDs
     const validIds = new Set(body.tasks.map((t) => t.id));
     out.selectedIds = out.selectedIds.filter((id) => validIds.has(id));
-    return Response.json({
-      ...out,
-      usage: {
-        input: response.usage.input_tokens,
-        output: response.usage.output_tokens,
-        cacheRead: response.usage.cache_read_input_tokens ?? 0,
-        cacheWrite: response.usage.cache_creation_input_tokens ?? 0,
-      },
-    });
+    const usage = {
+      input: response.usage.input_tokens,
+      output: response.usage.output_tokens,
+      cacheRead: response.usage.cache_read_input_tokens ?? 0,
+      cacheWrite: response.usage.cache_creation_input_tokens ?? 0,
+    };
+    const cost = estimateCost(CHAT_MODEL, usage);
+    recordSpend(req.headers, cost);
+    return Response.json({ ...out, usage: { ...usage, cost } });
   } catch (err) {
     return handleAnthropicError(err);
   }
