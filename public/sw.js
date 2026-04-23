@@ -108,10 +108,32 @@ self.addEventListener("push", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const target = event.notification.data?.url || "/";
+  const data = event.notification.data || {};
+  const target = data.url || "/";
+  const isReminder = data.kind === "reminder";
+  const action = event.action; // "done" | "snooze1h" | "snooze-tomorrow" | "" (body click)
+
   event.waitUntil(
     (async () => {
       const clientsList = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+
+      // If a reminder action was clicked, try to notify open clients
+      if (isReminder && action && data.taskId) {
+        const msg = { kind: "notif-action", taskId: data.taskId, action };
+        if (clientsList.length > 0) {
+          for (const c of clientsList) c.postMessage(msg);
+          // Still focus the app so user sees the change
+          const focusable = clientsList.find((c) => "focus" in c);
+          if (focusable) return focusable.focus();
+        } else {
+          // No client open — queue the action via URL param
+          const url = `/?task=${encodeURIComponent(data.taskId)}&action=${encodeURIComponent(action)}`;
+          if (self.clients.openWindow) return self.clients.openWindow(url);
+        }
+        return;
+      }
+
+      // Default: open / focus the app
       for (const client of clientsList) {
         if ("focus" in client) {
           await client.navigate(target).catch(() => {});

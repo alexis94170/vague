@@ -12,7 +12,7 @@
   "theme_color": "#6366f1",
   "lang": "fr",
   "dir": "ltr",
-  "categories": ["productivity", "utilities"],
+  "categories": ["productivity", "utilities", "business"],
   "icons": [
     {
       "src": "/icon-192.png",
@@ -37,16 +37,39 @@
     {
       "name": "Aujourd'hui",
       "short_name": "Aujourd'hui",
-      "description": "Tâches du jour",
+      "description": "Voir les tâches du jour",
       "url": "/?view=today",
       "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
     },
     {
-      "name": "Planifier",
+      "name": "Nouvelle tâche",
+      "short_name": "Ajouter",
+      "description": "Créer une nouvelle tâche",
+      "url": "/?action=new",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Assistant IA",
+      "short_name": "Assistant",
+      "description": "Demander à l'IA",
+      "url": "/?action=assistant",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Planifier ma journée",
       "short_name": "Planifier",
-      "description": "Planifier ma journée avec l'IA",
-      "url": "/?plan=1",
+      "description": "L'IA choisit 5-7 tâches pour aujourd'hui",
+      "url": "/?action=plan",
       "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
     }
-  ]
+  ],
+  "share_target": {
+    "action": "/?action=share",
+    "method": "GET",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  }
 }

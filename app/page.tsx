@@ -20,6 +20,7 @@ import CalendarView from "./components/CalendarView";
 import Dashboard from "./components/Dashboard";
 import PomodoroWidget from "./components/PomodoroWidget";
 import Notifications from "./components/Notifications";
+import NotifActionHandler from "./components/NotifActionHandler";
 import InstallPrompt from "./components/InstallPrompt";
 import KeyboardShortcuts from "./components/KeyboardShortcuts";
 import TemplatesDialog from "./components/TemplatesDialog";
@@ -262,6 +263,12 @@ export default function Home() {
       <AssistantChat open={chatOpen} onClose={() => setChatOpen(false)} />
       <PomodoroWidget />
       <Notifications />
+      <NotifActionHandler
+        onNavigate={navigate}
+        onOpenNewTask={() => setMobileAddOpen(true)}
+        onOpenAssistant={() => setChatOpen(true)}
+        onOpenPlan={() => setPlanOpen(true)}
+      />
       <InstallPrompt />
       <KeyboardShortcuts
         onNavigate={navigate}
