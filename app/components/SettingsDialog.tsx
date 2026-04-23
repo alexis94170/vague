@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { PALETTE_INFO, ThemeMode, ThemePalette, useTheme } from "../theme";
 import { notificationPermission, requestNotificationPermission } from "./Notifications";
 import { isPushSupported, isSubscribed, sendTestPush, subscribeToPush, unsubscribeFromPush } from "../lib/push-client";
+import { clearAiCost, getAiCostSummary } from "../lib/ai-cost-tracker";
 import Icon from "./Icon";
 
 type Props = {
@@ -17,11 +18,13 @@ export default function SettingsDialog({ open, onClose }: Props) {
   const [pushOn, setPushOn] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
   const [pushMsg, setPushMsg] = useState<string | null>(null);
+  const [aiCost, setAiCost] = useState(() => getAiCostSummary());
 
   useEffect(() => {
     if (open) {
       setNotifPerm(notificationPermission());
       isSubscribed().then(setPushOn);
+      setAiCost(getAiCostSummary());
     }
   }, [open]);
 
@@ -211,6 +214,50 @@ export default function SettingsDialog({ open, onClose }: Props) {
               {pushMsg && (
                 <div className="mt-2 text-[11px] text-[var(--accent)]">{pushMsg}</div>
               )}
+            </div>
+          </section>
+
+          {/* Utilisation IA */}
+          <section>
+            <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">Utilisation IA</h3>
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--bg)] p-4">
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <div className="text-[10.5px] uppercase tracking-wider text-[var(--text-subtle)]">Aujourd&apos;hui</div>
+                  <div className="mt-1 text-[18px] font-semibold tabular-nums">{aiCost.today < 0.01 ? "< 0,01 $" : `${aiCost.today.toFixed(2)} $`}</div>
+                </div>
+                <div>
+                  <div className="text-[10.5px] uppercase tracking-wider text-[var(--text-subtle)]">7 jours</div>
+                  <div className="mt-1 text-[18px] font-semibold tabular-nums">{aiCost.last7d < 0.01 ? "< 0,01 $" : `${aiCost.last7d.toFixed(2)} $`}</div>
+                </div>
+                <div>
+                  <div className="text-[10.5px] uppercase tracking-wider text-[var(--text-subtle)]">Total</div>
+                  <div className="mt-1 text-[18px] font-semibold tabular-nums">{aiCost.total < 0.01 ? "< 0,01 $" : `${aiCost.total.toFixed(2)} $`}</div>
+                </div>
+              </div>
+              {Object.keys(aiCost.byEndpoint).length > 0 && (
+                <div className="mt-3 space-y-1 border-t border-[var(--border)] pt-3">
+                  {Object.entries(aiCost.byEndpoint).map(([ep, d]) => (
+                    <div key={ep} className="flex items-center justify-between text-[11.5px] text-[var(--text-muted)]">
+                      <span>{ep} <span className="text-[var(--text-subtle)]">· {d.count} appel{d.count > 1 ? "s" : ""}</span></span>
+                      <span className="tabular-nums">{d.cost < 0.01 ? "< 0,01 $" : `${d.cost.toFixed(3)} $`}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="mt-3 flex items-center justify-between border-t border-[var(--border)] pt-3">
+                <div className="text-[11px] text-[var(--text-subtle)]">
+                  Budget max : <strong>1 $ / jour</strong> · reset minuit UTC
+                </div>
+                {aiCost.count > 0 && (
+                  <button
+                    onClick={() => { clearAiCost(); setAiCost(getAiCostSummary()); }}
+                    className="text-[11px] text-[var(--text-muted)] hover:text-rose-600"
+                  >
+                    Réinitialiser
+                  </button>
+                )}
+              </div>
             </div>
           </section>
 

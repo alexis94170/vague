@@ -45,6 +45,7 @@ import {
   removeOp,
   saveQueue,
 } from "./lib/offline-queue";
+import { runDailyBackup } from "./lib/auto-backup";
 
 type Ctx = {
   state: AppState;
@@ -137,11 +138,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   }, [user]);
 
-  // Cache state on every change
+  // Cache state on every change + daily backup
   useEffect(() => {
     if (loading) return;
     if (state.projects.length > 0 || state.tasks.length > 0) {
       cacheState({ projects: state.projects, tasks: state.tasks });
+      runDailyBackup(state.projects, state.tasks);
     }
   }, [state, loading]);
 

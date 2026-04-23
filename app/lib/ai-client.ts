@@ -2,6 +2,7 @@
 
 import { Priority, Project, Task } from "./types";
 import { todayISO, diffDays } from "./dates";
+import { recordAiCost } from "./ai-cost-tracker";
 
 export type ClassifyResult = {
   priority: Priority;
@@ -31,7 +32,9 @@ export async function aiClassify(title: string, projects: Project[], existingTag
     const err = await res.json().catch(() => ({ error: "Erreur inconnue" }));
     throw new Error(err.error ?? `HTTP ${res.status}`);
   }
-  return res.json();
+  const data = await res.json();
+  if (data?.usage?.cost) recordAiCost("classify", data.usage.cost);
+  return data;
 }
 
 export async function aiPlan(tasks: Task[], projects: Project[], opts?: { availableMinutes?: number; focus?: string }): Promise<PlanResult> {
@@ -65,7 +68,9 @@ export async function aiPlan(tasks: Task[], projects: Project[], opts?: { availa
     const err = await res.json().catch(() => ({ error: "Erreur inconnue" }));
     throw new Error(err.error ?? `HTTP ${res.status}`);
   }
-  return res.json();
+  const data = await res.json();
+  if (data?.usage?.cost) recordAiCost("plan", data.usage.cost);
+  return data;
 }
 
 export type Suggestion = {
@@ -104,7 +109,9 @@ export async function aiSuggest(tasks: Task[], projects: Project[]): Promise<Sug
     const err = await res.json().catch(() => ({ error: "Erreur" }));
     throw new Error(err.error ?? `HTTP ${res.status}`);
   }
-  return res.json();
+  const data = await res.json();
+  if (data?.cost) recordAiCost("suggest", data.cost);
+  return data;
 }
 
 export type ChatEvent =
@@ -164,11 +171,17 @@ export async function aiChat(
     for (const line of lines) {
       if (!line.trim()) continue;
       try {
-        onEvent(JSON.parse(line) as ChatEvent);
+        const ev = JSON.parse(line) as ChatEvent;
+        if (ev.type === "done" && ev.cost) recordAiCost("chat", ev.cost);
+        onEvent(ev);
       } catch {}
     }
   }
   if (buf.trim()) {
-    try { onEvent(JSON.parse(buf) as ChatEvent); } catch {}
+    try {
+      const ev = JSON.parse(buf) as ChatEvent;
+      if (ev.type === "done" && ev.cost) recordAiCost("chat", ev.cost);
+      onEvent(ev);
+    } catch {}
   }
 }

@@ -21,6 +21,8 @@ import Dashboard from "./components/Dashboard";
 import PomodoroWidget from "./components/PomodoroWidget";
 import Notifications from "./components/Notifications";
 import InstallPrompt from "./components/InstallPrompt";
+import KeyboardShortcuts from "./components/KeyboardShortcuts";
+import TemplatesDialog from "./components/TemplatesDialog";
 import Icon from "./components/Icon";
 import { todayISO } from "./lib/dates";
 
@@ -43,6 +45,7 @@ export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mobileAddOpen, setMobileAddOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [templatesOpen, setTemplatesOpen] = useState(false);
   const [planOpen, setPlanOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
 
@@ -106,6 +109,7 @@ export default function Home() {
           onOpenExport={() => { setExportOpen(true); setSidebarOpen(false); }}
           onOpenPalette={() => { setPaletteOpen(true); setSidebarOpen(false); }}
           onOpenSettings={() => { setSettingsOpen(true); setSidebarOpen(false); }}
+          onOpenTemplates={() => { setTemplatesOpen(true); setSidebarOpen(false); }}
         />
       </div>
 
@@ -253,11 +257,19 @@ export default function Home() {
       <ExportDialog open={exportOpen} onClose={() => setExportOpen(false)} />
       <TodayPicker open={todayPickerOpen} onClose={() => setTodayPickerOpen(false)} />
       <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <TemplatesDialog open={templatesOpen} onClose={() => setTemplatesOpen(false)} />
       <DailyPlan open={planOpen} onClose={() => setPlanOpen(false)} />
       <AssistantChat open={chatOpen} onClose={() => setChatOpen(false)} />
       <PomodoroWidget />
       <Notifications />
       <InstallPrompt />
+      <KeyboardShortcuts
+        onNavigate={navigate}
+        onNewTask={() => setMobileAddOpen(true)}
+        onSearch={() => setPaletteOpen(true)}
+        onAssistant={() => setChatOpen(true)}
+        onPlan={() => setPlanOpen(true)}
+      />
     </div>
   );
 }

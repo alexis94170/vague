@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useStore } from "../store";
 import { exportState, importState, normalizeIds } from "../lib/storage";
 import { AppState } from "../lib/types";
+import { loadBackups, deleteBackup } from "../lib/auto-backup";
+import { useToast } from "../toast";
 
 type Props = {
   open: boolean;
@@ -16,7 +18,9 @@ type LocalPreview = { state: AppState; taskCount: number; projectCount: number }
 
 export default function ExportDialog({ open, onClose }: Props) {
   const { state, replaceState, mergeImport } = useStore();
-  const [mode, setMode] = useState<"export" | "import">("export");
+  const toast = useToast();
+  const [mode, setMode] = useState<"export" | "import" | "history">("export");
+  const [backups, setBackups] = useState(loadBackups());
   const [importText, setImportText] = useState("");
   const [importError, setImportError] = useState<string | null>(null);
   const [importInfo, setImportInfo] = useState<string | null>(null);
@@ -26,6 +30,7 @@ export default function ExportDialog({ open, onClose }: Props) {
 
   useEffect(() => {
     if (!open || typeof window === "undefined") return;
+    setBackups(loadBackups());
     try {
       const raw = localStorage.getItem(LOCAL_KEY);
       if (!raw) return setLocalPreview(null);
@@ -41,6 +46,21 @@ export default function ExportDialog({ open, onClose }: Props) {
       setLocalPreview(null);
     }
   }, [open]);
+
+  function restoreFromBackup(ts: number) {
+    const b = backups.find((x) => x.ts === ts);
+    if (!b) return;
+    if (!confirm(`Restaurer la sauvegarde du ${b.date} ? ${b.tasks.length} tâches seront ajoutées (pas de remplacement).`)) return;
+    const normalized = normalizeIds({
+      version: 2,
+      projects: b.projects,
+      tasks: b.tasks,
+      settings: { theme: "system" },
+    });
+    mergeImport(normalized.projects, normalized.tasks);
+    toast.show({ message: `Sauvegarde du ${b.date} restaurée`, tone: "success" });
+    setTimeout(onClose, 800);
+  }
 
   if (!open) return null;
 
@@ -114,12 +134,65 @@ export default function ExportDialog({ open, onClose }: Props) {
             >
               Restaurer
             </button>
+            <button
+              onClick={() => setMode("history")}
+              className={`rounded px-2.5 py-1 text-sm ${
+                mode === "history" ? "bg-[var(--bg-hover)] font-medium" : "text-[var(--text-muted)]"
+              }`}
+            >
+              Historique
+            </button>
           </div>
           <button onClick={onClose} className="rounded px-2 py-1 text-sm hover:bg-[var(--bg-hover)]">✕</button>
         </div>
 
         <div className="px-4 py-4">
-          {mode === "export" ? (
+          {mode === "history" ? (
+            <>
+              <div className="text-[12.5px] text-[var(--text-muted)]">
+                Sauvegardes quotidiennes automatiques de tes données (dans ton navigateur). Restaure à tout moment.
+              </div>
+              <div className="mt-3 space-y-2">
+                {backups.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-[var(--border)] p-6 text-center text-[12.5px] text-[var(--text-subtle)]">
+                    Aucune sauvegarde pour l&apos;instant. Elles se créent automatiquement une fois par jour.
+                  </div>
+                ) : (
+                  [...backups].reverse().map((b) => {
+                    const date = new Date(b.ts);
+                    return (
+                      <div key={b.ts} className="flex items-center gap-3 rounded-lg border border-[var(--border)] bg-[var(--bg)] p-3">
+                        <div className="flex-1">
+                          <div className="text-[13px] font-medium">
+                            {date.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}
+                          </div>
+                          <div className="text-[11.5px] text-[var(--text-muted)]">
+                            {b.tasks.length} tâche{b.tasks.length > 1 ? "s" : ""} · {b.projects.length} projet{b.projects.length > 1 ? "s" : ""} · {date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => restoreFromBackup(b.ts)}
+                          className="rounded-md bg-[var(--accent)] px-3 py-1.5 text-[11.5px] font-medium text-white"
+                        >
+                          Restaurer
+                        </button>
+                        <button
+                          onClick={() => {
+                            deleteBackup(b.ts);
+                            setBackups(loadBackups());
+                          }}
+                          className="rounded-md border border-[var(--border)] bg-[var(--bg-elev)] p-1.5 text-[var(--text-subtle)] hover:text-rose-600"
+                          aria-label="Supprimer"
+                        >
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                        </button>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </>
+          ) : mode === "export" ? (
             <>
               <div className="text-xs text-[var(--text-muted)]">
                 Sauvegarde complète de tes projets et tâches au format JSON.

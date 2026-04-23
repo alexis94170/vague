@@ -14,6 +14,7 @@ type Props = {
   onOpenExport: () => void;
   onOpenPalette: () => void;
   onOpenSettings: () => void;
+  onOpenTemplates: () => void;
 };
 
 const VIEW_ITEMS: Array<{ kind: ViewKind["kind"]; label: string; icon: IconName }> = [
@@ -34,6 +35,7 @@ export default function Sidebar({
   onOpenExport,
   onOpenPalette,
   onOpenSettings,
+  onOpenTemplates,
 }: Props) {
   const { projects, tasks, allTags, addProject, deleteProject, renameProject, syncing, syncError, online, pendingOps } = useStore();
   const { user, signOut } = useAuth();
@@ -297,6 +299,13 @@ export default function Sidebar({
         >
           <Icon name="download" size={13} className="text-[var(--text-subtle)]" />
           Exporter
+        </button>
+        <button
+          onClick={onOpenTemplates}
+          className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[12px] text-[var(--text-muted)] transition hover:bg-[var(--bg-hover)] hover:text-[var(--text)]"
+        >
+          <Icon name="list" size={13} className="text-[var(--text-subtle)]" />
+          Modèles
         </button>
         <button
           onClick={onOpenSettings}
