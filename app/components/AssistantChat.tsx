@@ -6,6 +6,7 @@ import { aiChat, ChatEvent } from "../lib/ai-client";
 import { haptic } from "../lib/haptics";
 import { Priority, Task } from "../lib/types";
 import Icon from "./Icon";
+import VoiceButton from "./VoiceButton";
 
 type Msg = {
   role: "user" | "assistant";
@@ -25,7 +26,7 @@ const SUGGESTIONS = [
   "Reporte toutes mes tâches basses à la semaine prochaine",
 ];
 
-function friendlyActionSummary(name: string, input: Record<string, unknown>, lookup: (id: string) => string | undefined): string {
+function friendlyActionSummary(name: string, input: Record<string, unknown>, lookup: (id: string) => string | undefined, projectLookup: (id: string) => string | undefined): string {
   switch (name) {
     case "create_task": {
       const title = String(input.title ?? "");
@@ -52,6 +53,21 @@ function friendlyActionSummary(name: string, input: Record<string, unknown>, loo
       if (ids.length === 1) return `📅 « ${lookup(ids[0]) ?? "tâche"} » → ${date}`;
       return `📅 ${ids.length} tâches reportées au ${date}`;
     }
+    case "create_project": {
+      return `📁 Projet créé · « ${String(input.name ?? "")} »`;
+    }
+    case "rename_project": {
+      const old = projectLookup(String(input.projectId ?? "")) ?? "projet";
+      return `📁 Renommé · « ${old} » → « ${String(input.newName ?? "")} »`;
+    }
+    case "recolor_project": {
+      const name = projectLookup(String(input.projectId ?? "")) ?? "projet";
+      return `🎨 Couleur du projet « ${name} » mise à jour`;
+    }
+    case "delete_project": {
+      const name = projectLookup(String(input.projectId ?? "")) ?? "projet";
+      return `🗑 Projet « ${name} » supprimé`;
+    }
   }
   return `Action : ${name}`;
 }
@@ -75,6 +91,9 @@ export default function AssistantChat({ open, onClose }: Props) {
 
   function titleLookup(id: string): string | undefined {
     return tasks.find((t) => t.id === id)?.title;
+  }
+  function projectNameLookup(id: string): string | undefined {
+    return projects.find((p) => p.id === id)?.name;
   }
 
   function executeTool(name: string, input: Record<string, unknown>): boolean {
@@ -119,6 +138,33 @@ export default function AssistantChat({ open, onClose }: Props) {
           if (ids.length > 0 && date) store.patchTasks(ids, { dueDate: date });
           return true;
         }
+        case "create_project": {
+          const name = String(input.name ?? "").trim();
+          if (!name) return false;
+          const p = store.addProject(name);
+          if (input.color) store.recolorProject(p.id, String(input.color));
+          return true;
+        }
+        case "rename_project": {
+          const id = String(input.projectId ?? "");
+          const name = String(input.newName ?? "").trim();
+          if (!id || !name) return false;
+          store.renameProject(id, name);
+          return true;
+        }
+        case "recolor_project": {
+          const id = String(input.projectId ?? "");
+          const color = String(input.color ?? "");
+          if (!id || !color) return false;
+          store.recolorProject(id, color);
+          return true;
+        }
+        case "delete_project": {
+          const id = String(input.projectId ?? "");
+          if (!id || id === "inbox") return false;
+          store.deleteProject(id);
+          return true;
+        }
       }
     } catch (e) {
       console.error("tool exec failed:", e);
@@ -156,7 +202,7 @@ export default function AssistantChat({ open, onClose }: Props) {
               const ok = executeTool(event.name, event.input);
               if (ok) {
                 haptic("success");
-                const summary = friendlyActionSummary(event.name, event.input, titleLookup);
+                const summary = friendlyActionSummary(event.name, event.input, titleLookup, projectNameLookup);
                 next[next.length - 1] = {
                   ...last,
                   actions: [...(last.actions ?? []), { name: event.name, summary }],
@@ -303,17 +349,28 @@ export default function AssistantChat({ open, onClose }: Props) {
                 }
               }}
               rows={1}
-              placeholder="Dis-moi ce qu'il faut faire…"
+              placeholder="Dis-moi ce qu'il faut faire (ou tape 🎤 pour dicter)…"
               className="flex-1 resize-none rounded-xl border border-[var(--border)] bg-[var(--bg-elev)] px-3 py-2.5 text-[14px] outline-none focus:border-[var(--accent)]/40"
               style={{ maxHeight: 120 }}
             />
-            <button
-              type="submit"
-              disabled={!input.trim() || loading}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-white transition active:scale-95 disabled:opacity-40"
-            >
-              <Icon name="arrow-right" size={16} />
-            </button>
+            <div className="flex items-center gap-1">
+              <VoiceButton
+                size="md"
+                onTranscript={(text, isFinal) => {
+                  if (isFinal) {
+                    const merged = input.trim() ? input.trim() + " " + text : text;
+                    setInput(merged);
+                  }
+                }}
+              />
+              <button
+                type="submit"
+                disabled={!input.trim() || loading}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-white transition active:scale-95 disabled:opacity-40"
+              >
+                <Icon name="arrow-right" size={16} />
+              </button>
+            </div>
           </div>
         </form>
       </div>

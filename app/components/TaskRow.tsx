@@ -207,9 +207,17 @@ export default function TaskRow({ task, selected, onToggleSelect, onOpen, trashM
                 <span key={t} className="text-teal-600 dark:text-teal-400">#{t}</span>
               ))}
               {subTotal > 0 && (
-                <span className="flex items-center gap-1">
+                <span className="flex items-center gap-1.5">
                   <Icon name="list" size={10} />
-                  {subDone}/{subTotal}
+                  <span className="tabular-nums">{subDone}/{subTotal}</span>
+                  <span className="relative inline-block h-1 w-10 overflow-hidden rounded-full bg-[var(--bg-hover)]">
+                    <span
+                      className={`absolute inset-y-0 left-0 rounded-full ${
+                        subDone === subTotal ? "bg-emerald-500" : "bg-[var(--accent)]"
+                      }`}
+                      style={{ width: `${(subDone / subTotal) * 100}%` }}
+                    />
+                  </span>
                 </span>
               )}
               {task.estimateMinutes && (

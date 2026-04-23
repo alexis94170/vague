@@ -108,6 +108,53 @@ const TOOLS = [
       required: ["taskIds", "dueDate"],
     },
   },
+  {
+    name: "create_project",
+    description: "Crée un nouveau projet.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        name: { type: "string", description: "Nom du projet" },
+        color: { type: "string", description: "Code hex de couleur, ex #6366f1. Optionnel." },
+      },
+      required: ["name"],
+    },
+  },
+  {
+    name: "rename_project",
+    description: "Renomme un projet existant.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        projectId: { type: "string" },
+        newName: { type: "string" },
+      },
+      required: ["projectId", "newName"],
+    },
+  },
+  {
+    name: "recolor_project",
+    description: "Change la couleur d'un projet.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        projectId: { type: "string" },
+        color: { type: "string", description: "Code hex, ex: #f97316" },
+      },
+      required: ["projectId", "color"],
+    },
+  },
+  {
+    name: "delete_project",
+    description: "Supprime un projet. Les tâches du projet deviennent sans projet (à trier).",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        projectId: { type: "string" },
+      },
+      required: ["projectId"],
+    },
+  },
 ];
 
 export async function POST(req: Request) {

@@ -13,6 +13,7 @@ import CommandPalette from "./components/CommandPalette";
 import ImportDialog from "./components/ImportDialog";
 import ExportDialog from "./components/ExportDialog";
 import TodayPicker from "./components/TodayPicker";
+import TaskSkeleton from "./components/TaskSkeleton";
 import SettingsDialog from "./components/SettingsDialog";
 import DailyPlan from "./components/DailyPlan";
 import AssistantChat from "./components/AssistantChat";
@@ -36,7 +37,7 @@ function greeting(): string {
 }
 
 export default function Home() {
-  const { projects, tasks } = useStore();
+  const { projects, tasks, loading } = useStore();
   const [view, setView] = useState<ViewKind>({ kind: "today" });
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -218,6 +219,8 @@ export default function Home() {
             />
           ) : view.kind === "calendar" ? (
             <CalendarView onOpenTask={setOpenTaskId} />
+          ) : loading && tasks.length === 0 ? (
+            <TaskSkeleton rows={8} />
           ) : (
             <TaskList view={view} onOpenTask={setOpenTaskId} />
           )}

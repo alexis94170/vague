@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "../store";
 import { useToast } from "../toast";
 import { filterTasks, ViewKind } from "../lib/views";
@@ -59,10 +59,12 @@ function sortTasks(tasks: Task[]): Task[] {
 }
 
 export default function TaskList({ view, onOpenTask }: Props) {
-  const { tasks, projects, patchTasks, deleteTasks, restoreTasks, hardDeleteTasks, emptyTrash, snoozeTask, clearCompleted } = useStore();
+  const { tasks, projects, toggleDone, patchTasks, deleteTasks, restoreTasks, hardDeleteTasks, emptyTrash, snoozeTask, clearCompleted } = useStore();
   const toast = useToast();
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [focusIndex, setFocusIndex] = useState<number>(-1);
   const isTrash = view.kind === "trash";
+  const listRef = useRef<HTMLDivElement>(null);
 
   const filtered = useMemo(() => filterTasks(tasks, view), [tasks, view]);
 
@@ -128,8 +130,57 @@ export default function TaskList({ view, onOpenTask }: Props) {
   const hasSelection = selectedIds.length > 0;
   const isEmpty = groups.length === 0 || groups.every((g) => g.tasks.length === 0);
 
+  const flatTasks = useMemo(() => groups.flatMap((g) => g.tasks), [groups]);
+
+  // Keyboard navigation: J/K/Space/Enter
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const t = e.target as HTMLElement;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (flatTasks.length === 0) return;
+
+      if (e.key === "j" || e.key === "ArrowDown") {
+        e.preventDefault();
+        setFocusIndex((i) => Math.min(flatTasks.length - 1, i < 0 ? 0 : i + 1));
+      } else if (e.key === "k" || e.key === "ArrowUp") {
+        e.preventDefault();
+        setFocusIndex((i) => Math.max(0, i < 0 ? 0 : i - 1));
+      } else if (e.key === "Enter" && focusIndex >= 0) {
+        e.preventDefault();
+        const t = flatTasks[focusIndex];
+        if (t) onOpenTask(t.id);
+      } else if (e.key === " " && focusIndex >= 0 && !isTrash) {
+        e.preventDefault();
+        const t = flatTasks[focusIndex];
+        if (t && !t.done) toggleDone(t.id);
+        else if (t && t.done) toggleDone(t.id);
+      } else if ((e.key === "Delete" || e.key === "Backspace") && focusIndex >= 0 && !isTrash) {
+        e.preventDefault();
+        const t = flatTasks[focusIndex];
+        if (t) {
+          deleteTasks([t.id]);
+          toast.show({
+            message: `« ${t.title.slice(0, 40)} » vers la corbeille`,
+            action: { label: "Annuler", onClick: () => restoreTasks([t.id]) },
+          });
+          setFocusIndex((i) => Math.min(flatTasks.length - 2, i));
+        }
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [flatTasks, focusIndex, isTrash, toggleDone, deleteTasks, restoreTasks, onOpenTask, toast]);
+
+  // Scroll focused row into view
+  useEffect(() => {
+    if (focusIndex < 0) return;
+    const el = listRef.current?.querySelector(`[data-row-index="${focusIndex}"]`);
+    if (el) (el as HTMLElement).scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [focusIndex]);
+
   return (
-    <div className="relative overflow-hidden bg-[var(--bg-elev)] sm:rounded-xl sm:border sm:border-[var(--border)]">
+    <div ref={listRef} className="relative overflow-hidden bg-[var(--bg-elev)] sm:rounded-xl sm:border sm:border-[var(--border)]">
       {hasSelection && (
         <div className="sticky top-[84px] z-10 flex flex-wrap items-center gap-2 border-b border-[var(--border)] bg-[var(--bg-elev)]/95 px-4 py-2.5 text-[12px] backdrop-blur">
           <span className="font-medium text-[var(--text)]">
@@ -232,23 +283,27 @@ export default function TaskList({ view, onOpenTask }: Props) {
                 </header>
               )}
               <div className="divide-y divide-[var(--border)]/50">
-                {g.tasks.map((t) => (
-                  <TaskRow
-                    key={t.id}
-                    task={t}
-                    selected={selected.has(t.id)}
-                    onToggleSelect={toggleSelect}
-                    onOpen={onOpenTask}
-                    trashMode={isTrash}
-                    onRestore={() => {
-                      restoreTasks([t.id]);
-                      toast.show({ message: `« ${t.title.slice(0, 40)} » restaurée`, tone: "success" });
-                    }}
-                    onHardDelete={() => {
-                      if (confirm("Supprimer définitivement cette tâche ?")) hardDeleteTasks([t.id]);
-                    }}
-                  />
-                ))}
+                {g.tasks.map((t) => {
+                  const idx = flatTasks.indexOf(t);
+                  return (
+                    <div key={t.id} data-row-index={idx} className={focusIndex === idx ? "ring-2 ring-inset ring-[var(--accent)]/40" : ""}>
+                      <TaskRow
+                        task={t}
+                        selected={selected.has(t.id)}
+                        onToggleSelect={toggleSelect}
+                        onOpen={onOpenTask}
+                        trashMode={isTrash}
+                        onRestore={() => {
+                          restoreTasks([t.id]);
+                          toast.show({ message: `« ${t.title.slice(0, 40)} » restaurée`, tone: "success" });
+                        }}
+                        onHardDelete={() => {
+                          if (confirm("Supprimer définitivement cette tâche ?")) hardDeleteTasks([t.id]);
+                        }}
+                      />
+                    </div>
+                  );
+                })}
               </div>
             </section>
           ))}
