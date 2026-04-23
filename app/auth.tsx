@@ -15,16 +15,40 @@ type AuthCtx = {
 
 const AuthContext = createContext<AuthCtx | null>(null);
 
+// Synchronously read the Supabase session from localStorage for instant boot.
+// Avoids the async round-trip of getUser()/getSession() before showing UI.
+function readLocalSession(): User | null {
+  if (typeof window === "undefined") return null;
+  try {
+    // Supabase JS stores the session under keys like "sb-<project-ref>-auth-token"
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k || !k.startsWith("sb-") || !k.endsWith("-auth-token")) continue;
+      const raw = localStorage.getItem(k);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw) as { user?: User; expires_at?: number };
+      // Check expiry if present
+      if (parsed.expires_at && parsed.expires_at * 1000 < Date.now()) continue;
+      if (parsed.user) return parsed.user;
+    }
+  } catch {}
+  return null;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Initial state comes from localStorage — no async wait at boot
+  const [user, setUser] = useState<User | null>(() => readLocalSession());
+  // If we already have a session from localStorage, we're not "loading"
+  const [loading, setLoading] = useState(() => readLocalSession() === null);
 
   useEffect(() => {
     const sb = supabase();
-    sb.auth.getUser().then(({ data }) => {
-      setUser(data.user);
+    // Fast path: getSession() reads from local storage, returns ~instantly
+    sb.auth.getSession().then(({ data }) => {
+      setUser(data.session?.user ?? null);
       setLoading(false);
-    });
+    }).catch(() => setLoading(false));
+
     const { data: { subscription } } = sb.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
       setLoading(false);
