@@ -39,8 +39,7 @@ export default function QuickAdd({ view, onSubmitted, autoFocus }: Props) {
   const [openEst, setOpenEst] = useState(false);
 
   useEffect(() => {
-    if (view.kind === "today") setDueDate(todayISO());
-    else setDueDate(undefined);
+    setDueDate(undefined);
     if (view.kind === "project") setProjectId(view.id);
     else setProjectId(undefined);
     if (view.kind === "tag") setTags([view.tag]);
@@ -79,8 +78,7 @@ export default function QuickAdd({ view, onSubmitted, autoFocus }: Props) {
 
   function reset() {
     setTitle("");
-    if (view.kind === "today") setDueDate(todayISO());
-    else setDueDate(undefined);
+    setDueDate(undefined);
     setDueTime(undefined);
     setPriority("none");
     if (view.kind === "project") setProjectId(view.id);

@@ -42,11 +42,19 @@ export default function TaskDrawer({ taskId, onClose, onFocus }: Props) {
     patchTask(draft.id, patch);
   }
 
-  function addSub(title: string) {
+  function addSub(title: string, section?: string) {
     if (!draft) return;
     if (!title.trim()) return;
-    const sub: Subtask = { id: newId(), title: title.trim(), done: false };
+    const sub: Subtask = { id: newId(), title: title.trim(), done: false, section };
     save({ subtasks: [...draft.subtasks, sub] });
+  }
+  function updateSubSection(id: string, section: string | undefined) {
+    if (!draft) return;
+    save({ subtasks: draft.subtasks.map((s) => (s.id === id ? { ...s, section: section || undefined } : s)) });
+  }
+  function renameSection(oldName: string, newName: string) {
+    if (!draft) return;
+    save({ subtasks: draft.subtasks.map((s) => (s.section === oldName ? { ...s, section: newName.trim() || undefined } : s)) });
   }
 
   function toggleSub(id: string) {
@@ -295,37 +303,15 @@ export default function TaskDrawer({ taskId, onClose, onFocus }: Props) {
                 {draft.subtasks.filter((s) => s.done).length}/{draft.subtasks.length}
               </div>
             </div>
-            <div className="space-y-0.5 rounded-lg border border-[var(--border)] bg-[var(--bg)] p-2">
-              {draft.subtasks.map((s) => (
-                <div key={s.id} className="group flex items-center gap-2 rounded-md px-2 py-1 transition hover:bg-[var(--bg-hover)]">
-                  <button
-                    onClick={() => toggleSub(s.id)}
-                    className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border-[1.5px] transition ${
-                      s.done
-                        ? "border-[var(--accent)] bg-[var(--accent)]"
-                        : "border-[var(--border-strong)] hover:border-[var(--accent)]"
-                    }`}
-                  >
-                    {s.done && <Icon name="check" size={10} className="text-white" />}
-                  </button>
-                  <input
-                    value={s.title}
-                    onChange={(e) => {
-                      const title = e.target.value;
-                      save({ subtasks: draft.subtasks.map((x) => (x.id === s.id ? { ...x, title } : x)) });
-                    }}
-                    className={`flex-1 bg-transparent text-[13px] outline-none ${s.done ? "text-[var(--text-subtle)] line-through" : ""}`}
-                  />
-                  <button
-                    onClick={() => removeSub(s.id)}
-                    className="invisible text-[var(--text-subtle)] transition hover:text-rose-600 group-hover:visible"
-                  >
-                    <Icon name="x" size={12} />
-                  </button>
-                </div>
-              ))}
-              <SubtaskAdd onAdd={addSub} />
-            </div>
+            <SubtaskList
+              subtasks={draft.subtasks}
+              onToggle={toggleSub}
+              onRename={(id, title) => save({ subtasks: draft.subtasks.map((x) => (x.id === id ? { ...x, title } : x)) })}
+              onRemove={removeSub}
+              onAdd={addSub}
+              onMoveSection={updateSubSection}
+              onRenameSection={renameSection}
+            />
           </div>
 
           <div className="mt-8 text-[11px] text-[var(--text-subtle)]">
@@ -340,6 +326,160 @@ export default function TaskDrawer({ taskId, onClose, onFocus }: Props) {
 
 const fieldInput =
   "w-full rounded-md border border-[var(--border)] bg-[var(--bg)] px-2.5 py-1.5 text-[13px] outline-none transition hover:border-[var(--border-strong)] focus:border-[var(--accent)]/50";
+
+function SubtaskList({
+  subtasks,
+  onToggle,
+  onRename,
+  onRemove,
+  onAdd,
+  onMoveSection,
+  onRenameSection,
+}: {
+  subtasks: Subtask[];
+  onToggle: (id: string) => void;
+  onRename: (id: string, title: string) => void;
+  onRemove: (id: string) => void;
+  onAdd: (title: string, section?: string) => void;
+  onMoveSection: (id: string, section: string | undefined) => void;
+  onRenameSection: (oldName: string, newName: string) => void;
+}) {
+  // Group: order by first appearance
+  const groups: Array<{ name: string; items: Subtask[] }> = [];
+  const seen = new Map<string, number>();
+  for (const s of subtasks) {
+    const key = s.section || "";
+    let idx = seen.get(key);
+    if (idx === undefined) {
+      idx = groups.length;
+      seen.set(key, idx);
+      groups.push({ name: key, items: [] });
+    }
+    groups[idx].items.push(s);
+  }
+  // Move "no section" to first
+  groups.sort((a, b) => (a.name === "" ? -1 : b.name === "" ? 1 : 0));
+
+  const [editingSection, setEditingSection] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+
+  return (
+    <div className="space-y-3 rounded-lg border border-[var(--border)] bg-[var(--bg)] p-2">
+      {groups.map((g) => (
+        <div key={g.name || "_default"} className="space-y-0.5">
+          {g.name && (
+            <div className="flex items-center justify-between px-2 pb-0.5 pt-1.5">
+              {editingSection === g.name ? (
+                <input
+                  autoFocus
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  onBlur={() => {
+                    if (editName.trim() !== g.name) onRenameSection(g.name, editName.trim());
+                    setEditingSection(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      if (editName.trim() !== g.name) onRenameSection(g.name, editName.trim());
+                      setEditingSection(null);
+                    } else if (e.key === "Escape") {
+                      setEditingSection(null);
+                    }
+                  }}
+                  className="flex-1 bg-transparent text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] outline-none"
+                />
+              ) : (
+                <button
+                  onClick={() => { setEditingSection(g.name); setEditName(g.name); }}
+                  className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] hover:text-[var(--text)]"
+                >
+                  {g.name}
+                </button>
+              )}
+              <span className="text-[10.5px] tabular-nums text-[var(--text-subtle)]">
+                {g.items.filter((s) => s.done).length}/{g.items.length}
+              </span>
+            </div>
+          )}
+          <div>
+            {g.items.map((s) => (
+              <div key={s.id} className="group flex items-center gap-2 rounded-md px-2 py-1 transition hover:bg-[var(--bg-hover)]">
+                <button
+                  onClick={() => onToggle(s.id)}
+                  className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border-[1.5px] transition ${
+                    s.done
+                      ? "border-[var(--accent)] bg-[var(--accent)]"
+                      : "border-[var(--border-strong)] hover:border-[var(--accent)]"
+                  }`}
+                >
+                  {s.done && <Icon name="check" size={10} className="text-white" />}
+                </button>
+                <input
+                  value={s.title}
+                  onChange={(e) => onRename(s.id, e.target.value)}
+                  className={`flex-1 bg-transparent text-[13px] outline-none ${s.done ? "text-[var(--text-subtle)] line-through" : ""}`}
+                />
+                <button
+                  onClick={() => onRemove(s.id)}
+                  className="invisible text-[var(--text-subtle)] transition hover:text-rose-600 group-hover:visible"
+                  title="Supprimer"
+                >
+                  <Icon name="x" size={12} />
+                </button>
+              </div>
+            ))}
+            <SubtaskAdd onAdd={(t) => onAdd(t, g.name || undefined)} placeholder={g.name ? `+ Ajouter dans « ${g.name} »` : "+ Ajouter une sous-tâche"} />
+          </div>
+        </div>
+      ))}
+      {/* Add new section */}
+      <SectionAdd onAdd={(name) => {
+        // Move next subtask creation into this section by creating placeholder
+        const trimmed = name.trim();
+        if (!trimmed) return;
+        // Add an empty subtask in the new section so the section appears
+        onAdd("Nouvelle étape", trimmed);
+      }} />
+    </div>
+  );
+}
+
+function SectionAdd({ onAdd }: { onAdd: (name: string) => void }) {
+  const [v, setV] = useState("");
+  const [open, setOpen] = useState(false);
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[11.5px] text-[var(--text-subtle)] transition hover:bg-[var(--bg-hover)] hover:text-[var(--text-muted)]"
+      >
+        <Icon name="plus" size={11} />
+        Nouvelle catégorie de sous-tâches
+      </button>
+    );
+  }
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (v.trim()) onAdd(v);
+        setV("");
+        setOpen(false);
+      }}
+      className="flex items-center gap-2 rounded-md px-2 py-1"
+    >
+      <Icon name="plus" size={11} className="text-[var(--text-subtle)]" />
+      <input
+        autoFocus
+        value={v}
+        onChange={(e) => setV(e.target.value)}
+        onBlur={() => { if (!v.trim()) setOpen(false); }}
+        placeholder="Nom de la catégorie (ex: Préparation, Cuisson…)"
+        className="flex-1 bg-transparent text-[12px] uppercase tracking-wider outline-none placeholder:text-[var(--text-subtle)] placeholder:normal-case placeholder:tracking-normal"
+      />
+    </form>
+  );
+}
 
 function NotesEditor({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const [mode, setMode] = useState<"edit" | "preview">(value ? "preview" : "edit");
@@ -403,7 +543,7 @@ function Field({ label, icon, children }: { label: string; icon: Parameters<type
   );
 }
 
-function SubtaskAdd({ onAdd }: { onAdd: (title: string) => void }) {
+function SubtaskAdd({ onAdd, placeholder = "Ajouter une sous-tâche" }: { onAdd: (title: string) => void; placeholder?: string }) {
   const [v, setV] = useState("");
   return (
     <form
@@ -420,7 +560,7 @@ function SubtaskAdd({ onAdd }: { onAdd: (title: string) => void }) {
       <input
         value={v}
         onChange={(e) => setV(e.target.value)}
-        placeholder="Ajouter une sous-tâche"
+        placeholder={placeholder}
         className="flex-1 bg-transparent text-[13px] outline-none placeholder:text-[var(--text-subtle)]"
       />
     </form>

@@ -12,6 +12,7 @@ export type Subtask = {
   id: string;
   title: string;
   done: boolean;
+  section?: string;
 };
 
 export type Project = {

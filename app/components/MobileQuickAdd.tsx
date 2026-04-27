@@ -45,8 +45,7 @@ export default function MobileQuickAdd({ open, onClose, view }: Props) {
   // Init defaults from current view each time the sheet opens
   useEffect(() => {
     if (!open) return;
-    if (view.kind === "today") setDueDate(todayISO());
-    else setDueDate(undefined);
+    setDueDate(undefined);
     if (view.kind === "project") setProjectId(view.id);
     else setProjectId(undefined);
     if (view.kind === "tag") setTags([view.tag]);
@@ -351,12 +350,35 @@ function Sheet({
   onClose: () => void;
   children: React.ReactNode;
 }) {
+  // Track viewport height to handle on-screen keyboard properly
+  const [vh, setVh] = useState<number | null>(null);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const vv = window.visualViewport;
+    if (!vv) {
+      setVh(window.innerHeight);
+      return;
+    }
+    const handler = () => setVh(vv.height);
+    handler();
+    vv.addEventListener("resize", handler);
+    vv.addEventListener("scroll", handler);
+    return () => {
+      vv.removeEventListener("resize", handler);
+      vv.removeEventListener("scroll", handler);
+    };
+  }, []);
+
   return (
     <div className="fixed inset-0 z-[60] flex flex-col bg-black/40 anim-fade-in" onClick={onClose}>
-      <div className="flex-1" />
+      <div className="flex-1" onClick={onClose} />
       <div
         onClick={(e) => e.stopPropagation()}
-        className="anim-slide-up flex max-h-[80vh] flex-col rounded-t-2xl border-t border-[var(--border)] bg-[var(--bg-elev)] shadow-2xl safe-bottom"
+        className="anim-slide-up flex flex-col rounded-t-2xl border-t border-[var(--border)] bg-[var(--bg-elev)] shadow-2xl"
+        style={{
+          maxHeight: vh ? `${vh * 0.85}px` : "80vh",
+          paddingBottom: "env(safe-area-inset-bottom)",
+        }}
       >
         <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3">
           <h3 className="text-[14px] font-semibold">{title}</h3>
@@ -364,7 +386,7 @@ function Sheet({
             <Icon name="x" size={16} />
           </button>
         </div>
-        <div className="overflow-y-auto">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
       </div>
     </div>
   );
@@ -453,7 +475,6 @@ function ProjectSheet({
       <div className="p-2">
         <div className="px-2 pb-2">
           <input
-            autoFocus
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Chercher ou créer…"
@@ -566,7 +587,6 @@ function TagsSheet({
         )}
         <div className="px-2 pb-2">
           <input
-            autoFocus
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
