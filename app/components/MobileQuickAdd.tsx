@@ -404,28 +404,46 @@ function DateSheet({
   onClose: () => void;
 }) {
   const today = todayISO();
-  const options = [
+  // Find next saturday for "Ce week-end"
+  const todayDate = new Date();
+  const daysToSaturday = (6 - todayDate.getDay() + 7) % 7 || 7;
+  // Find next monday
+  const daysToNextMonday = ((1 - todayDate.getDay() + 7) % 7) || 7;
+
+  const options: Array<{ label: string; date: string; time?: string; hint?: string }> = [
+    { label: "Ce soir", date: today, time: "18:00", hint: "à 18h" },
     { label: "Aujourd'hui", date: today },
+    { label: "Demain matin", date: addDays(today, 1), time: "09:00", hint: "à 9h" },
     { label: "Demain", date: addDays(today, 1) },
     { label: weekdayName(addDays(today, 2)), date: addDays(today, 2) },
     { label: weekdayName(addDays(today, 3)), date: addDays(today, 3) },
+    { label: "Ce week-end", date: addDays(today, daysToSaturday), hint: "samedi" },
+    { label: "Lundi prochain", date: addDays(today, daysToNextMonday) },
     { label: "Dans 1 semaine", date: addDays(today, 7) },
+    { label: "Dans 2 semaines", date: addDays(today, 14) },
+    { label: "Dans 1 mois", date: addDays(today, 30) },
   ];
   return (
     <Sheet title="Date d'échéance" onClose={onClose}>
       <div className="p-2">
-        {options.map((o) => (
-          <button
-            key={o.date}
-            onClick={() => onChange(o.date, time)}
-            className={`flex w-full items-center justify-between rounded-xl px-4 py-3 text-[14px] transition active:scale-[0.98] ${
-              value === o.date ? "bg-[var(--accent-soft)] text-[var(--accent)]" : "text-[var(--text)] hover:bg-[var(--bg-hover)]"
-            }`}
-          >
-            <span className="capitalize">{o.label}</span>
-            <span className="text-[12px] text-[var(--text-subtle)]">{formatShort(o.date)}</span>
-          </button>
-        ))}
+        {options.map((o, i) => {
+          const active = value === o.date && (o.time ? time === o.time : true);
+          return (
+            <button
+              key={`${o.date}-${i}`}
+              onClick={() => onChange(o.date, o.time ?? time)}
+              className={`flex w-full items-center justify-between rounded-xl px-4 py-3 text-[14px] transition active:scale-[0.98] ${
+                active ? "bg-[var(--accent-soft)] text-[var(--accent)]" : "text-[var(--text)] hover:bg-[var(--bg-hover)]"
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <span className="capitalize">{o.label}</span>
+                {o.hint && <span className="text-[11px] text-[var(--text-subtle)]">{o.hint}</span>}
+              </span>
+              <span className="text-[12px] text-[var(--text-subtle)]">{formatShort(o.date)}</span>
+            </button>
+          );
+        })}
         <div className="mt-2 flex gap-2 px-2 pb-2">
           <input
             type="date"

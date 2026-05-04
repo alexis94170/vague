@@ -310,28 +310,43 @@ function DatePopover({
   onChange: (d?: string, t?: string) => void;
 }) {
   const today = todayISO();
-  const options: Array<{ label: string; date: string }> = [
+  const todayDate = new Date();
+  const daysToSaturday = (6 - todayDate.getDay() + 7) % 7 || 7;
+  const daysToNextMonday = ((1 - todayDate.getDay() + 7) % 7) || 7;
+  const options: Array<{ label: string; date: string; time?: string; hint?: string }> = [
+    { label: "Ce soir", date: today, time: "18:00", hint: "18 h" },
     { label: "Aujourd'hui", date: today },
+    { label: "Demain matin", date: addDays(today, 1), time: "09:00", hint: "9 h" },
     { label: "Demain", date: addDays(today, 1) },
-    { label: `${weekdayName(addDays(today, 2))}`, date: addDays(today, 2) },
-    { label: `${weekdayName(addDays(today, 3))}`, date: addDays(today, 3) },
+    { label: weekdayName(addDays(today, 2)), date: addDays(today, 2) },
+    { label: weekdayName(addDays(today, 3)), date: addDays(today, 3) },
+    { label: "Ce week-end", date: addDays(today, daysToSaturday), hint: "samedi" },
+    { label: "Lundi prochain", date: addDays(today, daysToNextMonday) },
     { label: "Dans 1 semaine", date: addDays(today, 7) },
+    { label: "Dans 2 semaines", date: addDays(today, 14) },
+    { label: "Dans 1 mois", date: addDays(today, 30) },
   ];
   return (
-    <div className="w-64 p-1.5">
-      {options.map((o) => (
-        <button
-          key={o.date}
-          type="button"
-          onClick={() => onChange(o.date, time)}
-          className={`flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-[13px] transition hover:bg-[var(--bg-hover)] ${
-            value === o.date ? "bg-[var(--accent-soft)] text-[var(--accent)]" : ""
-          }`}
-        >
-          <span>{o.label}</span>
-          <span className="text-[11px] text-[var(--text-subtle)]">{formatShort(o.date)}</span>
-        </button>
-      ))}
+    <div className="max-h-[420px] w-72 overflow-y-auto p-1.5">
+      {options.map((o, i) => {
+        const active = value === o.date && (o.time ? time === o.time : true);
+        return (
+          <button
+            key={`${o.date}-${i}`}
+            type="button"
+            onClick={() => onChange(o.date, o.time ?? time)}
+            className={`flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-[13px] transition hover:bg-[var(--bg-hover)] ${
+              active ? "bg-[var(--accent-soft)] text-[var(--accent)]" : ""
+            }`}
+          >
+            <span className="flex items-center gap-2">
+              <span>{o.label}</span>
+              {o.hint && <span className="text-[10.5px] text-[var(--text-subtle)]">{o.hint}</span>}
+            </span>
+            <span className="text-[11px] text-[var(--text-subtle)]">{formatShort(o.date)}</span>
+          </button>
+        );
+      })}
       <div className="my-1 border-t border-[var(--border)]" />
       <div className="flex items-center gap-2 px-2 py-1.5">
         <input
