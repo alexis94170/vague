@@ -1,21 +1,21 @@
 "use client";
 
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { createBrowserClient } from "@supabase/ssr";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 let client: SupabaseClient | null = null;
 
+/**
+ * Browser Supabase client.
+ * Uses cookie-based session storage (via @supabase/ssr) so the Next.js server
+ * routes can also read the user via createServerClient.
+ */
 export function supabase(): SupabaseClient {
   if (!client) {
-    client = createClient(url, key, {
-      auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: true,
-      },
-    });
+    client = createBrowserClient(url, key);
   }
   return client;
 }
