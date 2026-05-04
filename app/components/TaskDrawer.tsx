@@ -88,7 +88,7 @@ export default function TaskDrawer({ taskId, onClose, onFocus }: Props) {
               <button
                 onClick={() => onFocus(draft.id)}
                 title="Mode focus"
-                className="flex items-center gap-1 rounded-full bg-[var(--text)] px-2.5 py-1 text-[11.5px] font-medium text-[var(--bg)]"
+                className="flex items-center gap-1 rounded-full bg-[var(--accent)] px-2.5 py-1 text-[11.5px] font-medium text-[var(--accent-fg)]"
               >
                 <Icon name="sparkles" size={11} />
                 Focus
@@ -489,7 +489,7 @@ function SectionAdd({ onAdd }: { onAdd: (name: string) => void }) {
         <button
           type="button"
           onClick={submit}
-          className="rounded-md bg-[var(--accent)] px-2 py-0.5 text-[10.5px] font-medium text-[var(--bg)]"
+          className="rounded-md bg-[var(--accent)] px-2 py-0.5 text-[10.5px] font-medium text-[var(--accent-fg)]"
         >
           OK
         </button>
@@ -589,7 +589,7 @@ function SubtaskAdd({ onAdd, placeholder = "Ajouter une sous-tâche" }: { onAdd:
         <button
           type="button"
           onClick={submit}
-          className="rounded-md bg-[var(--accent)] px-2 py-0.5 text-[10.5px] font-medium text-[var(--bg)]"
+          className="rounded-md bg-[var(--accent)] px-2 py-0.5 text-[10.5px] font-medium text-[var(--accent-fg)]"
         >
           OK
         </button>

@@ -97,15 +97,15 @@ export default function ShoppingWidget() {
     <section className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-elev)]">
       <button
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center gap-3 px-5 py-4 text-left"
+        className="flex w-full items-center gap-3 px-5 py-4 text-left transition-colors hover:bg-[var(--bg-hover)]/40"
       >
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--bg-hover)] text-[18px]">
-          🛒
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)]">
+          <Icon name="cart" size={18} />
         </span>
         <div className="min-w-0 flex-1">
-          <div className="text-[14px] font-semibold text-[var(--text)]">Courses</div>
-          <div className="truncate text-[11.5px] text-[var(--text-muted)]">
-            {remaining.length === 0 ? "Aucun article" : `${remaining.length} article${remaining.length > 1 ? "s" : ""}${done.length > 0 ? ` · ${done.length} dans le panier` : ""}`}
+          <div className="text-[14px] font-semibold tracking-tight text-[var(--text-strong)]">Courses</div>
+          <div className="mt-0.5 truncate text-[12px] text-[var(--text-muted)]">
+            {remaining.length === 0 ? "Liste vide" : `${remaining.length} article${remaining.length > 1 ? "s" : ""}${done.length > 0 ? ` · ${done.length} dans le panier` : ""}`}
           </div>
         </div>
         <Icon name="chevron-right" size={14} className={`shrink-0 text-[var(--text-subtle)] transition-transform ${open ? "rotate-90" : ""}`} />
@@ -132,7 +132,7 @@ export default function ShoppingWidget() {
             {input.trim() && (
               <button
                 onClick={() => add(input)}
-                className="rounded-lg bg-[var(--accent)] px-2.5 py-0.5 text-[11px] font-semibold text-[var(--bg)]"
+                className="rounded-lg bg-[var(--accent)] px-2.5 py-0.5 text-[11px] font-semibold text-[var(--accent-fg)]"
               >
                 OK
               </button>
@@ -192,7 +192,7 @@ export default function ShoppingWidget() {
                   <div key={it.id} className="group flex items-center gap-2 rounded-md px-1.5 py-1.5">
                     <button
                       onClick={() => toggle(it.id)}
-                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--bg)]"
+                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--accent-fg)]"
                     >
                       <Icon name="check" size={11} />
                     </button>

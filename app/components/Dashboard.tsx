@@ -66,146 +66,256 @@ export default function Dashboard({ onOpenPlan, onOpenChat, onNavigate }: Props)
 
   const greeting = getGreeting();
   const firstName = (user?.email ?? "").split("@")[0] ?? "";
-  const todayLabel = new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
-  const todayLabelCap = todayLabel.charAt(0).toUpperCase() + todayLabel.slice(1);
+  const firstNameCap = firstName ? firstName.charAt(0).toUpperCase() + firstName.slice(1) : "";
+  const todayDate = new Date();
+  const dayName = todayDate.toLocaleDateString("fr-FR", { weekday: "long" });
+  const dayNum = todayDate.getDate();
+  const monthName = todayDate.toLocaleDateString("fr-FR", { month: "long" });
 
-  // Headline
-  let headline = `${stats.plannedToday + stats.overdue} tâche${stats.plannedToday + stats.overdue > 1 ? "s" : ""} pour aujourd'hui`;
-  if (stats.plannedToday + stats.overdue === 0) {
-    headline = stats.active > 0 ? "Rien de prévu aujourd'hui" : "Tout est sous contrôle.";
-  }
+  // Most pertinent action
+  const todoCount = stats.plannedToday + stats.overdue;
+  const headline = todoCount === 0
+    ? (stats.active > 0 ? "Rien de prévu" : "Tout est sous contrôle")
+    : `${todoCount} ${todoCount > 1 ? "tâches" : "tâche"}`;
+  const headlineSub = todoCount === 0
+    ? (stats.active > 0 ? "Profite de ta journée." : "Bravo. Pause méritée.")
+    : "à traiter aujourd'hui";
+
+  // Circle stroke for hero progress
+  const circ = 2 * Math.PI * 36;
+  const dash = stats.total > 0 ? (stats.doneToday / stats.total) * circ : 0;
 
   return (
-    <div className="space-y-3">
-      {/* HERO — single, generous, calm */}
-      <section className="rounded-3xl border border-[var(--border)] bg-[var(--bg-elev)] px-6 py-7">
-        <div className="flex items-baseline justify-between gap-4">
-          <div>
-            <div className="text-[12px] font-medium text-[var(--text-muted)]">{todayLabelCap}</div>
-            <h2 className="mt-1 text-[24px] font-semibold leading-tight tracking-tight">
-              {greeting}{firstName ? `, ${firstName}` : ""}.
-            </h2>
-            <p className="mt-2 text-[14px] text-[var(--text-muted)]">{headline}</p>
-          </div>
-        </div>
+    <div className="space-y-4">
+      {/* === HERO === */}
+      <section className="relative overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--bg-elev)] card-glow">
+        {/* Decorative wave in corner */}
+        <svg
+          className="pointer-events-none absolute -right-8 -top-8 h-44 w-44 text-[var(--accent)] opacity-[0.06]"
+          viewBox="0 0 200 200"
+          fill="none"
+        >
+          <path
+            d="M 0 100 Q 25 70, 50 100 T 100 100 T 150 100 T 200 100"
+            stroke="currentColor"
+            strokeWidth="2"
+            fill="none"
+          />
+          <path
+            d="M 0 120 Q 25 90, 50 120 T 100 120 T 150 120 T 200 120"
+            stroke="currentColor"
+            strokeWidth="2"
+            fill="none"
+          />
+          <path
+            d="M 0 140 Q 25 110, 50 140 T 100 140 T 150 140 T 200 140"
+            stroke="currentColor"
+            strokeWidth="2"
+            fill="none"
+          />
+        </svg>
 
-        {stats.total > 0 && (
-          <div className="mt-5 space-y-2">
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-[28px] font-bold tabular-nums leading-none text-[var(--text)]">{stats.doneToday}</span>
-              <span className="text-[14px] text-[var(--text-muted)]">/ {stats.total} faites</span>
+        <div className="relative px-6 pt-6 pb-5 sm:px-8 sm:pt-8">
+          {/* Date pill */}
+          <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.12em] text-[var(--text-subtle)]">
+            <span className="h-1 w-1 rounded-full bg-[var(--accent)] anim-pulse-soft" />
+            <span className="capitalize">{dayName}</span>
+            <span className="opacity-40">·</span>
+            <span className="num">{dayNum}</span>
+            <span className="capitalize">{monthName}</span>
+          </div>
+
+          {/* Greeting */}
+          <h1 className="mt-3 text-[26px] font-semibold leading-[1.1] tracking-tight text-[var(--text-strong)] sm:text-[30px]">
+            {greeting}{firstNameCap ? `, ${firstNameCap}` : ""}.
+          </h1>
+
+          {/* Headline + ring */}
+          <div className="mt-5 flex items-center gap-5">
+            <div className="min-w-0 flex-1">
+              <div className="text-[42px] font-semibold leading-none tracking-tight text-[var(--text-strong)] sm:text-[48px] num">
+                {todoCount === 0 ? "✓" : todoCount}
+              </div>
+              <div className="mt-1 text-[14px] text-[var(--text-muted)]">
+                {headlineSub}
+              </div>
+            </div>
+
+            {/* Progress ring */}
+            {stats.total > 0 && (
+              <div className="relative shrink-0">
+                <svg width="84" height="84" viewBox="0 0 84 84" className="-rotate-90">
+                  <circle
+                    cx="42"
+                    cy="42"
+                    r="36"
+                    fill="none"
+                    stroke="var(--bg-hover)"
+                    strokeWidth="6"
+                  />
+                  <circle
+                    cx="42"
+                    cy="42"
+                    r="36"
+                    fill="none"
+                    stroke={stats.pct === 100 ? "var(--success)" : "var(--accent)"}
+                    strokeWidth="6"
+                    strokeLinecap="round"
+                    strokeDasharray={`${dash} ${circ}`}
+                    style={{ transition: "stroke-dasharray 0.6s cubic-bezier(0.2, 0.9, 0.3, 1)" }}
+                  />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="text-[15px] font-semibold leading-none text-[var(--text-strong)] num">{stats.pct}%</span>
+                  <span className="mt-0.5 text-[9.5px] uppercase tracking-wider text-[var(--text-subtle)] num">{stats.doneToday}/{stats.total}</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Highlights row */}
+          {(stats.urgent > 0 || stats.overdue > 0 || stats.doneToday > 0) && (
+            <div className="mt-5 flex flex-wrap items-center gap-1.5">
               {stats.urgent > 0 && (
-                <span className="ml-auto rounded-full bg-rose-500/10 px-2.5 py-0.5 text-[11px] font-semibold text-rose-600 dark:text-rose-400">
+                <button
+                  onClick={() => onNavigate("today")}
+                  className="flex items-center gap-1.5 rounded-full border border-rose-500/20 bg-rose-500/10 px-2.5 py-1 text-[11.5px] font-medium text-rose-700 transition active:scale-95 dark:text-rose-400"
+                >
+                  <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
                   {stats.urgent} urgente{stats.urgent > 1 ? "s" : ""}
+                </button>
+              )}
+              {stats.overdue > 0 && (
+                <button
+                  onClick={() => onNavigate("today")}
+                  className="flex items-center gap-1.5 rounded-full border border-amber-500/20 bg-amber-500/10 px-2.5 py-1 text-[11.5px] font-medium text-amber-700 transition active:scale-95 dark:text-amber-400"
+                >
+                  {stats.overdue} en retard
+                </button>
+              )}
+              {stats.doneToday > 0 && (
+                <span className="flex items-center gap-1.5 rounded-full border border-[var(--accent)]/20 bg-[var(--accent-soft)] px-2.5 py-1 text-[11.5px] font-medium text-[var(--accent)]">
+                  <Icon name="check" size={11} />
+                  {stats.doneToday} faite{stats.doneToday > 1 ? "s" : ""}
                 </span>
               )}
             </div>
-            <div className="relative h-1 overflow-hidden rounded-full bg-[var(--bg-hover)]">
-              <div
-                className={`absolute inset-y-0 left-0 rounded-full transition-all ${stats.pct === 100 ? "bg-emerald-500" : "bg-[var(--accent)]"}`}
-                style={{ width: `${stats.pct}%` }}
-              />
-            </div>
-          </div>
-        )}
+          )}
 
-        <div className="mt-5 flex flex-wrap gap-2">
-          <button
-            onClick={() => onNavigate("today")}
-            className="flex items-center gap-1.5 rounded-full bg-[var(--text)] px-4 py-2 text-[12.5px] font-medium text-[var(--bg)] transition active:scale-95"
-          >
-            Voir ma journée
-            <Icon name="chevron-right" size={12} />
-          </button>
-          <button
-            onClick={onOpenPlan}
-            className="flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-transparent px-4 py-2 text-[12.5px] font-medium text-[var(--text-muted)] transition hover:border-[var(--accent)]/40 hover:text-[var(--accent)]"
-          >
-            <Icon name="sparkles" size={12} />
-            Planifier
-          </button>
-          <button
-            onClick={onOpenChat}
-            className="flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-transparent px-4 py-2 text-[12.5px] font-medium text-[var(--text-muted)] transition hover:border-[var(--accent)]/40 hover:text-[var(--accent)]"
-          >
-            <Icon name="sparkles" size={12} />
-            Assistant
-          </button>
+          {/* Actions */}
+          <div className="mt-6 grid grid-cols-3 gap-2">
+            <button
+              onClick={() => onNavigate("today")}
+              className="group flex items-center justify-center gap-1.5 rounded-2xl bg-[var(--accent)] px-3 py-3 text-[13px] font-semibold text-[var(--accent-fg)] shadow-sm transition active:scale-[0.97]"
+            >
+              Ma journée
+              <Icon name="chevron-right" size={13} className="transition group-hover:translate-x-0.5" />
+            </button>
+            <button
+              onClick={onOpenPlan}
+              className="flex items-center justify-center gap-1.5 rounded-2xl border border-[var(--border)] bg-[var(--bg)] px-3 py-3 text-[13px] font-medium text-[var(--text)] transition hover:bg-[var(--bg-hover)] active:scale-[0.97]"
+            >
+              <Icon name="sparkles" size={12} />
+              Planifier
+            </button>
+            <button
+              onClick={onOpenChat}
+              className="flex items-center justify-center gap-1.5 rounded-2xl border border-[var(--border)] bg-[var(--bg)] px-3 py-3 text-[13px] font-medium text-[var(--text)] transition hover:bg-[var(--bg-hover)] active:scale-[0.97]"
+            >
+              <Icon name="sparkles" size={12} />
+              Assistant
+            </button>
+          </div>
         </div>
       </section>
 
-      {/* AI suggestions (only if user wants them — already collapsible) */}
+      {/* AI suggestions */}
       <SuggestionsPanel />
 
-      {/* Compact widgets */}
+      {/* Quick stats grid */}
+      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+        <StatCard
+          label="En retard"
+          value={stats.overdue}
+          tone={stats.overdue > 0 ? "danger" : "neutral"}
+          onClick={() => onNavigate("today")}
+        />
+        <StatCard
+          label="Aujourd'hui"
+          value={stats.plannedToday}
+          tone={stats.plannedToday > 0 ? "warning" : "neutral"}
+          onClick={() => onNavigate("today")}
+        />
+        <StatCard
+          label="À trier"
+          value={tasks.filter((t) => !t.done && !t.waiting && !t.deletedAt && !t.projectId).length}
+          tone="neutral"
+          onClick={() => onNavigate("untriaged")}
+        />
+        <StatCard
+          label="En attente"
+          value={stats.waiting}
+          tone="neutral"
+          onClick={() => onNavigate("waiting")}
+        />
+      </div>
+
+      {/* Widgets */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <ShoppingWidget />
         <SportsWidget />
       </div>
 
-      {/* Activity — collapsed by default */}
+      {/* Activity */}
       <details className="group rounded-2xl border border-[var(--border)] bg-[var(--bg-elev)]">
         <summary className="flex cursor-pointer list-none items-center justify-between px-5 py-4">
           <div className="flex items-center gap-3">
             <span className="text-[13.5px] font-semibold text-[var(--text)]">Activité de la semaine</span>
-            <span className="text-[11.5px] text-[var(--text-muted)]">{stats.weekDone} faite{stats.weekDone > 1 ? "s" : ""}</span>
+            <span className="text-[11.5px] text-[var(--text-muted)] num">
+              {stats.weekDone} faite{stats.weekDone > 1 ? "s" : ""}
+            </span>
           </div>
           <Icon name="chevron-right" size={14} className="text-[var(--text-subtle)] transition-transform group-open:rotate-90" />
         </summary>
         <div className="border-t border-[var(--border)] px-5 py-5">
-          {/* Mini stats */}
-          <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <button
-              onClick={() => onNavigate("today")}
-              className="rounded-xl bg-[var(--bg)] p-3 text-left transition hover:bg-[var(--bg-hover)]"
-            >
-              <div className="text-[20px] font-bold tabular-nums leading-tight text-rose-600 dark:text-rose-400">{stats.overdue}</div>
-              <div className="text-[10.5px] font-medium uppercase tracking-wider text-[var(--text-muted)]">En retard</div>
-            </button>
-            <button
-              onClick={() => onNavigate("today")}
-              className="rounded-xl bg-[var(--bg)] p-3 text-left transition hover:bg-[var(--bg-hover)]"
-            >
-              <div className="text-[20px] font-bold tabular-nums leading-tight text-amber-600 dark:text-amber-400">{stats.plannedToday}</div>
-              <div className="text-[10.5px] font-medium uppercase tracking-wider text-[var(--text-muted)]">Aujourd&apos;hui</div>
-            </button>
-            <button
-              onClick={() => onNavigate("untriaged")}
-              className="rounded-xl bg-[var(--bg)] p-3 text-left transition hover:bg-[var(--bg-hover)]"
-            >
-              <div className="text-[20px] font-bold tabular-nums leading-tight text-[var(--text)]">{tasks.filter((t) => !t.done && !t.waiting && !t.deletedAt && !t.projectId).length}</div>
-              <div className="text-[10.5px] font-medium uppercase tracking-wider text-[var(--text-muted)]">À trier</div>
-            </button>
-            <button
-              onClick={() => onNavigate("waiting")}
-              className="rounded-xl bg-[var(--bg)] p-3 text-left transition hover:bg-[var(--bg-hover)]"
-            >
-              <div className="text-[20px] font-bold tabular-nums leading-tight text-yellow-600 dark:text-yellow-400">{stats.waiting}</div>
-              <div className="text-[10.5px] font-medium uppercase tracking-wider text-[var(--text-muted)]">En attente</div>
-            </button>
-          </div>
-
-          {/* 7-day chart */}
-          <div className="rounded-xl bg-[var(--bg)] p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <h4 className="text-[12.5px] font-semibold">7 derniers jours</h4>
-              <span className="text-[11px] text-[var(--text-muted)]">{stats.weekDone} faite{stats.weekDone > 1 ? "s" : ""}</span>
+          {/* 7-day chart, full width */}
+          <div className="rounded-2xl bg-[var(--bg)] p-5">
+            <div className="mb-4 flex items-end justify-between">
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">7 derniers jours</div>
+                <div className="mt-0.5 text-[22px] font-semibold leading-tight text-[var(--text-strong)] num">
+                  {stats.weekDone}
+                  <span className="ml-1 text-[12px] font-normal text-[var(--text-muted)]">
+                    tâche{stats.weekDone > 1 ? "s" : ""} terminée{stats.weekDone > 1 ? "s" : ""}
+                  </span>
+                </div>
+              </div>
+              {stats.doneYesterday > 0 && (
+                <div className="text-right text-[11px] text-[var(--text-muted)]">
+                  Hier · <span className="font-medium text-[var(--text)] num">{stats.doneYesterday}</span>
+                </div>
+              )}
             </div>
-            <div className="flex items-end gap-2 h-16">
+            <div className="flex h-20 items-end gap-2">
               {stats.days.map((d, i) => {
                 const isToday = d.date === today;
-                const h = d.count > 0 ? Math.max(8, (d.count / stats.maxDay) * 100) : 4;
+                const h = d.count > 0 ? Math.max(10, (d.count / stats.maxDay) * 100) : 4;
                 return (
-                  <div key={i} className="flex flex-1 flex-col items-center gap-1">
+                  <div key={i} className="flex flex-1 flex-col items-center gap-1.5">
                     <div className="flex w-full flex-1 items-end">
                       <div
-                        className={`w-full rounded-t-md transition-all ${
-                          d.count === 0 ? "bg-[var(--bg-hover)]" : isToday ? "bg-[var(--accent)]" : "bg-[var(--accent)]/50"
+                        className={`w-full rounded-md transition-all ${
+                          d.count === 0
+                            ? "bg-[var(--bg-hover)]"
+                            : isToday
+                              ? "bg-[var(--accent)]"
+                              : "bg-[var(--accent)]/40"
                         }`}
                         style={{ height: `${h}%` }}
+                        title={d.count > 0 ? `${d.count} tâche${d.count > 1 ? "s" : ""}` : "Aucune tâche"}
                       />
                     </div>
-                    <span className={`text-[9.5px] tabular-nums ${isToday ? "font-bold text-[var(--accent)]" : "text-[var(--text-subtle)]"}`}>
+                    <span className={`text-[10px] num ${isToday ? "font-semibold text-[var(--accent)]" : "text-[var(--text-subtle)]"}`}>
                       {d.label}
                     </span>
                   </div>
@@ -216,6 +326,37 @@ export default function Dashboard({ onOpenPlan, onOpenChat, onNavigate }: Props)
         </div>
       </details>
     </div>
+  );
+}
+
+function StatCard({
+  label,
+  value,
+  tone,
+  onClick,
+}: {
+  label: string;
+  value: number;
+  tone: "danger" | "warning" | "neutral";
+  onClick: () => void;
+}) {
+  const valueClass =
+    tone === "danger" && value > 0 ? "text-rose-600 dark:text-rose-400" :
+    tone === "warning" && value > 0 ? "text-amber-600 dark:text-amber-400" :
+    "text-[var(--text-strong)]";
+
+  return (
+    <button
+      onClick={onClick}
+      className="group rounded-2xl border border-[var(--border)] bg-[var(--bg-elev)] p-4 text-left transition hover:border-[var(--border-strong)] hover:bg-[var(--bg-hover)] active:scale-[0.98]"
+    >
+      <div className={`text-[26px] font-semibold leading-none tracking-tight num ${valueClass}`}>
+        {value}
+      </div>
+      <div className="mt-2 text-[11px] font-medium uppercase tracking-wider text-[var(--text-muted)]">
+        {label}
+      </div>
+    </button>
   );
 }
 

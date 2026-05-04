@@ -123,13 +123,26 @@ export default function Home() {
         {/* Desktop header */}
         <header className="sticky top-0 z-20 hidden items-center justify-between gap-3 border-b border-[var(--border)] glass px-8 py-5 md:flex">
           <div className="flex min-w-0 items-center gap-3">
-            {project && (
-              <span className="h-3 w-3 shrink-0 rounded-full shadow-sm" style={{ background: project.color }} />
+            {view.kind === "dashboard" ? (
+              <div className="flex items-center gap-2.5">
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--accent)] text-[var(--accent-fg)]">
+                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 12c2-4 5-4 7 0s5 4 7 0 4-4 4-4" />
+                  </svg>
+                </span>
+                <h2 className="text-xl font-semibold tracking-tight">Vague</h2>
+              </div>
+            ) : (
+              <>
+                {project && (
+                  <span className="h-3 w-3 shrink-0 rounded-full shadow-sm" style={{ background: project.color }} />
+                )}
+                <div className="min-w-0">
+                  <h2 className="truncate text-xl font-semibold tracking-tight">{title}</h2>
+                  <div className="mt-0.5 text-[12.5px] text-[var(--text-muted)]">{subtitle}</div>
+                </div>
+              </>
             )}
-            <div className="min-w-0">
-              <h2 className="truncate text-xl font-semibold tracking-tight">{title}</h2>
-              <div className="mt-0.5 text-[12.5px] text-[var(--text-muted)]">{subtitle}</div>
-            </div>
           </div>
           <div className="flex shrink-0 items-center gap-1">
             {view.kind === "today" && (
@@ -198,15 +211,17 @@ export default function Home() {
               </button>
             </div>
           </div>
-          <div className="px-4 pb-3 pt-1">
-            <div className="flex items-center gap-2.5">
-              {project && (
-                <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: project.color }} />
-              )}
-              <h2 className="truncate text-[28px] font-bold leading-tight tracking-tight">{title}</h2>
+          {view.kind !== "dashboard" && (
+            <div className="px-4 pb-3 pt-1">
+              <div className="flex items-center gap-2.5">
+                {project && (
+                  <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: project.color }} />
+                )}
+                <h2 className="truncate text-[26px] font-semibold leading-tight tracking-tight">{title}</h2>
+              </div>
+              <div className="mt-1 text-[13px] text-[var(--text-muted)]">{subtitle}</div>
             </div>
-            <div className="mt-1 text-[13px] text-[var(--text-muted)]">{subtitle}</div>
-          </div>
+          )}
         </header>
 
         {/* Desktop quick-add */}
@@ -235,17 +250,17 @@ export default function Home() {
         </div>
       </main>
 
-      {/* Mobile FAB — minimalist, mono-tone */}
+      {/* Mobile FAB — premium, signature accent */}
       <button
         onClick={() => setMobileAddOpen(true)}
-        className="fixed right-4 z-30 flex h-12 w-12 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--bg)] transition active:scale-90 md:hidden no-select"
+        className="fixed right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--accent-fg)] transition active:scale-90 md:hidden no-select"
         style={{
-          bottom: "calc(env(safe-area-inset-bottom) + 72px)",
-          boxShadow: "var(--shadow-md)",
+          bottom: "calc(env(safe-area-inset-bottom) + 76px)",
+          boxShadow: "var(--shadow-lg)",
         }}
         aria-label="Ajouter une tâche"
       >
-        <Icon name="plus" size={22} />
+        <Icon name="plus" size={24} />
       </button>
 
       {/* Bottom nav (mobile only) */}

@@ -13,9 +13,8 @@ type Props = { onOpenTask: (id: string) => void };
 type Section = {
   id: string;
   label: string;
-  icon: "clock" | "sun" | "calendar" | "check";
+  range?: string;
   tone?: string;
-  emptyHint?: string;
   tasks: Task[];
 };
 
@@ -36,7 +35,7 @@ function timeSlot(time: string): "morning" | "afternoon" | "evening" {
 }
 
 export default function TodayView({ onOpenTask }: Props) {
-  const { tasks, restoreTasks, hardDeleteTasks, deleteTasks, snoozeTask, patchTasks, clearCompleted } = useStore();
+  const { tasks, restoreTasks, deleteTasks } = useStore();
   const toast = useToast();
   const [showCompleted, setShowCompleted] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -54,18 +53,15 @@ export default function TodayView({ onOpenTask }: Props) {
 
     for (const t of tasks) {
       if (t.deletedAt) continue;
-      // done today
       if (t.done) {
         if (t.doneAt && t.doneAt.slice(0, 10) === today) doneToday.push(t);
         continue;
       }
       if (t.waiting) continue;
-      // overdue (date passée)
       if (t.dueDate && t.dueDate < today) {
         overdue.push(t);
         continue;
       }
-      // tâches du jour
       if (t.dueDate === today) {
         if (!t.dueTime) {
           noTime.push(t);
@@ -79,11 +75,11 @@ export default function TodayView({ onOpenTask }: Props) {
     }
 
     const sections: Section[] = [
-      ...(overdue.length ? [{ id: "overdue", label: "En retard", icon: "calendar" as const, tone: "text-rose-500", tasks: sortTasks(overdue) }] : []),
-      { id: "morning", label: "Matin", icon: "sun" as const, tasks: sortTasks(morning) },
-      { id: "afternoon", label: "Après-midi", icon: "clock" as const, tasks: sortTasks(afternoon) },
-      { id: "evening", label: "Soir", icon: "clock" as const, tasks: sortTasks(evening) },
-      { id: "noTime", label: "Sans heure", icon: "calendar" as const, tasks: sortTasks(noTime) },
+      ...(overdue.length ? [{ id: "overdue", label: "En retard", tone: "text-rose-600 dark:text-rose-400", tasks: sortTasks(overdue) }] : []),
+      { id: "morning", label: "Matin", range: "5h – 12h", tasks: sortTasks(morning) },
+      { id: "afternoon", label: "Après-midi", range: "12h – 17h", tasks: sortTasks(afternoon) },
+      { id: "evening", label: "Soir", range: "17h – 23h", tasks: sortTasks(evening) },
+      { id: "noTime", label: "Sans heure", tasks: sortTasks(noTime) },
     ].filter((s) => s.tasks.length > 0);
 
     const totals = {
@@ -114,83 +110,116 @@ export default function TodayView({ onOpenTask }: Props) {
     });
   }
 
+  // Empty state
   if (totals.total === 0 && totals.done === 0) {
     return (
-      <div className="flex flex-col items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--bg-elev)] py-16 text-center">
-        <span className="flex h-12 w-12 items-center justify-center rounded-full border border-[var(--border)] text-[var(--text-muted)]">
-          <Icon name="check" size={20} />
-        </span>
-        <h3 className="mt-4 text-[15px] font-semibold">Rien aujourd&apos;hui</h3>
-        <p className="mt-1 max-w-sm text-[13px] text-[var(--text-muted)]">
-          Glisse une tâche depuis une autre vue, ou utilise <span className="text-[var(--text)]">Planifier</span> pour laisser l&apos;IA t&apos;en proposer.
+      <div className="rounded-3xl border border-[var(--border)] bg-[var(--bg-elev)] py-20 text-center">
+        <div className="mx-auto flex h-20 w-20 items-center justify-center">
+          <svg viewBox="0 0 80 80" className="h-20 w-20 text-[var(--accent)]" fill="none">
+            <circle cx="40" cy="40" r="32" stroke="currentColor" strokeWidth="1.5" opacity="0.15" />
+            <path
+              d="M 16 44 Q 24 38, 32 44 T 48 44 T 64 44"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              fill="none"
+              opacity="0.5"
+            />
+            <path
+              d="M 16 36 Q 24 30, 32 36 T 48 36 T 64 36"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              fill="none"
+              opacity="0.8"
+            />
+          </svg>
+        </div>
+        <h3 className="mt-5 text-[17px] font-semibold tracking-tight text-[var(--text-strong)]">Une journée tranquille</h3>
+        <p className="mt-1.5 mx-auto max-w-xs text-[13.5px] text-[var(--text-muted)]">
+          Aucune tâche prévue. Glisse-en une depuis une autre vue, ou utilise <span className="font-medium text-[var(--text)]">Planifier</span>.
         </p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-3">
-      {/* HERO — minimalist, no gradient */}
-      <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-elev)] px-5 py-5">
-        <div className="flex items-baseline justify-between gap-3">
-          <h3 className="text-[18px] font-semibold tracking-tight text-[var(--text)]">
-            {totals.total === 0 ? "Tout est fait." : `${totals.total} pour aujourd'hui`}
-          </h3>
-          {totals.urgent > 0 && (
-            <span className="text-[11.5px] font-medium text-rose-600 dark:text-rose-400">
-              {totals.urgent} urgente{totals.urgent > 1 ? "s" : ""}
-            </span>
+    <div className="space-y-4">
+      {/* === HERO === */}
+      <section className="relative overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--bg-elev)]">
+        <div className="px-6 pt-6 pb-5 sm:px-7">
+          <div className="flex items-end justify-between gap-4">
+            <div className="min-w-0 flex-1">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-subtle)]">Aujourd'hui</div>
+              <div className="mt-2 flex items-baseline gap-2">
+                <span className="text-[44px] font-semibold leading-none tracking-tight text-[var(--text-strong)] num">{totals.total}</span>
+                <span className="text-[14px] text-[var(--text-muted)]">
+                  {totals.total === 0 ? "Tout est fait" : totals.total > 1 ? "tâches" : "tâche"}
+                </span>
+              </div>
+              {(totals.urgent > 0 || estimateLabel) && (
+                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-[var(--text-muted)]">
+                  {totals.urgent > 0 && (
+                    <span className="text-rose-600 dark:text-rose-400 font-medium">
+                      {totals.urgent} urgente{totals.urgent > 1 ? "s" : ""}
+                    </span>
+                  )}
+                  {estimateLabel && <span>{estimateLabel}</span>}
+                </div>
+              )}
+            </div>
+
+            {total > 0 && (
+              <div className="text-right">
+                <div className={`text-[26px] font-semibold leading-none num ${pct === 100 ? "text-[var(--success)]" : "text-[var(--text-strong)]"}`}>
+                  {pct}%
+                </div>
+                <div className="mt-1 text-[10.5px] uppercase tracking-wider text-[var(--text-subtle)] num">
+                  {totals.done}/{total} faites
+                </div>
+              </div>
+            )}
+          </div>
+
+          {total > 0 && (
+            <div className="mt-5">
+              <div className="relative h-1.5 overflow-hidden rounded-full bg-[var(--bg-hover)]">
+                <div
+                  className={`absolute inset-y-0 left-0 rounded-full transition-all duration-700 ${pct === 100 ? "bg-[var(--success)]" : "bg-[var(--accent)]"}`}
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+            </div>
           )}
         </div>
-        {(totals.overdue > 0 || estimateLabel || totals.done > 0) && (
-          <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[12px] text-[var(--text-muted)]">
-            {totals.overdue > 0 && (
-              <span className="text-rose-600 dark:text-rose-400">{totals.overdue} en retard</span>
-            )}
-            {estimateLabel && <span>{estimateLabel}</span>}
-            {totals.done > 0 && <span>{totals.done} faite{totals.done > 1 ? "s" : ""}</span>}
-          </div>
-        )}
+      </section>
 
-        {total > 0 && (
-          <div className="mt-4">
-            <div className="relative h-1 overflow-hidden rounded-full bg-[var(--bg-hover)]">
-              <div
-                className={`absolute inset-y-0 left-0 rounded-full transition-all ${
-                  pct === 100 ? "bg-emerald-500" : "bg-[var(--accent)]"
-                }`}
-                style={{ width: `${pct}%` }}
-              />
-            </div>
-            <div className="mt-1.5 flex items-center justify-between text-[10.5px] tabular-nums text-[var(--text-muted)]">
-              <span>{totals.done} / {total}</span>
-              <span>{pct}%</span>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Sections */}
+      {/* === Sections === */}
       {sections.map((s) => {
-        // Highlight current slot
         const isCurrent =
           (s.id === "morning" && nowMins < 12 * 60) ||
           (s.id === "afternoon" && nowMins >= 12 * 60 && nowMins < 17 * 60) ||
           (s.id === "evening" && nowMins >= 17 * 60);
         return (
           <section key={s.id} className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-elev)]">
-            <header className="flex items-center justify-between px-5 py-2.5">
-              <div className="flex items-center gap-2">
-                <h4 className={`text-[10.5px] font-semibold uppercase tracking-wider ${s.tone ?? "text-[var(--text-muted)]"}`}>
+            <header className="flex items-center justify-between px-5 pt-3.5 pb-2">
+              <div className="flex items-baseline gap-2.5">
+                <h4 className={`text-[12px] font-semibold tracking-wide ${s.tone ?? "text-[var(--text-strong)]"}`}>
                   {s.label}
                 </h4>
+                {s.range && (
+                  <span className="text-[10.5px] text-[var(--text-subtle)] num">{s.range}</span>
+                )}
                 {isCurrent && (
-                  <span className="text-[10px] font-medium text-[var(--accent)]">
-                    · Maintenant
+                  <span className="flex items-center gap-1 text-[10px] font-medium uppercase tracking-wider text-[var(--accent)]">
+                    <span className="h-1 w-1 rounded-full bg-[var(--accent)] anim-pulse-soft" />
+                    Maintenant
                   </span>
                 )}
               </div>
-              <span className="text-[10.5px] tabular-nums text-[var(--text-subtle)]">{s.tasks.length}</span>
+              <span className="text-[11px] tabular-nums text-[var(--text-subtle)]">
+                {s.tasks.length}
+              </span>
             </header>
             <div className="divide-y divide-[var(--border)]/60">
               {s.tasks.map((t) => (
@@ -207,17 +236,27 @@ export default function TodayView({ onOpenTask }: Props) {
         );
       })}
 
-      {/* Done today */}
+      {/* === Done today === */}
       {totals.doneToday.length > 0 && (
         <section className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-elev)]">
           <button
             onClick={() => setShowCompleted(!showCompleted)}
-            className="flex w-full items-center justify-between px-5 py-2.5 hover:bg-[var(--bg-hover)]/50"
+            className="flex w-full items-center justify-between px-5 pt-3.5 pb-3 hover:bg-[var(--bg-hover)]/50"
           >
-            <h4 className="text-[10.5px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
-              Faites · {totals.doneToday.length}
-            </h4>
-            <Icon name="chevron-right" size={12} className={`text-[var(--text-subtle)] transition-transform ${showCompleted ? "rotate-90" : ""}`} />
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--accent-soft)] text-[var(--accent)]">
+                <Icon name="check" size={11} />
+              </span>
+              <h4 className="text-[12px] font-semibold tracking-wide text-[var(--text-strong)]">
+                Terminées
+              </h4>
+              <span className="text-[11px] tabular-nums text-[var(--text-subtle)]">{totals.doneToday.length}</span>
+            </div>
+            <Icon
+              name="chevron-right"
+              size={13}
+              className={`text-[var(--text-subtle)] transition-transform ${showCompleted ? "rotate-90" : ""}`}
+            />
           </button>
           {showCompleted && (
             <div className="divide-y divide-[var(--border)]/60 border-t border-[var(--border)]">
@@ -235,10 +274,10 @@ export default function TodayView({ onOpenTask }: Props) {
         </section>
       )}
 
-      {/* Selection bar (if any selected) */}
+      {/* === Selection bar === */}
       {selected.size > 0 && (
-        <div className="sticky bottom-20 z-20 flex items-center justify-between rounded-full border border-[var(--border)] bg-[var(--bg-elev)] px-4 py-2 shadow-lg">
-          <span className="text-[12px] font-medium">{selected.size} sélectionnée{selected.size > 1 ? "s" : ""}</span>
+        <div className="sticky bottom-20 z-20 flex items-center justify-between rounded-full border border-[var(--border)] bg-[var(--bg-elev)] px-4 py-2 shadow-lg anim-fade-up">
+          <span className="text-[12px] font-medium num">{selected.size} sélectionnée{selected.size > 1 ? "s" : ""}</span>
           <div className="flex items-center gap-1">
             <button
               onClick={() => {

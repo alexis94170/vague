@@ -233,7 +233,7 @@ export default function QuickAdd({ view, onSubmitted, autoFocus }: Props) {
         <button
           type="submit"
           disabled={!title.trim()}
-          className="ml-auto rounded-full bg-[var(--accent)] px-3.5 py-1 text-[12px] font-medium text-[var(--bg)] transition hover:bg-[var(--accent-hover)] disabled:opacity-40"
+          className="ml-auto rounded-full bg-[var(--accent)] px-3.5 py-1 text-[12px] font-medium text-[var(--accent-fg)] transition hover:bg-[var(--accent-hover)] disabled:opacity-40"
         >
           Ajouter
         </button>

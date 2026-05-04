@@ -127,7 +127,7 @@ export default function SuggestionsPanel() {
     <section className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-elev)]">
       <header className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[var(--text)] text-[var(--bg)]">
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[var(--accent)] text-[var(--accent-fg)]">
             <Icon name="sparkles" size={11} />
           </span>
           <div className="min-w-0">
@@ -207,7 +207,7 @@ export default function SuggestionsPanel() {
                   {s.action !== "none" && (
                     <button
                       onClick={() => applyAction(s, idx)}
-                      className="rounded-full bg-[var(--accent)] px-3 py-1 text-[11.5px] font-medium text-[var(--bg)] transition active:scale-95"
+                      className="rounded-full bg-[var(--accent)] px-3 py-1 text-[11.5px] font-medium text-[var(--accent-fg)] transition active:scale-95"
                     >
                       {ACTION_LABEL[s.action]}
                     </button>

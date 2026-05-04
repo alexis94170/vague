@@ -86,7 +86,7 @@ export default function DailyPlan({ open, onClose }: Props) {
       >
         <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4 safe-top">
           <div className="flex items-center gap-2">
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--text)] text-[var(--bg)]">
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--accent)] text-[var(--accent-fg)]">
               <Icon name="sparkles" size={14} />
             </span>
             <h2 className="text-[17px] font-semibold">Planifier ma journée</h2>
@@ -134,7 +134,7 @@ export default function DailyPlan({ open, onClose }: Props) {
               ) : (
                 <button
                   onClick={run}
-                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--accent)] px-4 py-3 text-[14px] font-medium text-white transition hover:bg-[var(--accent-hover)] active:scale-[0.98]"
+                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--accent)] px-4 py-3 text-[14px] font-medium text-[var(--accent-fg)] transition hover:bg-[var(--accent-hover)] active:scale-[0.98]"
                 >
                   <Icon name="sparkles" size={16} />
                   Générer le plan du jour

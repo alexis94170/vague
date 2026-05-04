@@ -150,7 +150,7 @@ export default function MobileQuickAdd({ open, onClose, view }: Props) {
         <button
           onClick={submit}
           disabled={!title.trim()}
-          className="no-select rounded-full bg-[var(--accent)] px-4 py-1.5 text-[13px] font-semibold text-[var(--bg)] transition active:scale-95 disabled:opacity-40"
+          className="no-select rounded-full bg-[var(--accent)] px-4 py-1.5 text-[13px] font-semibold text-[var(--accent-fg)] transition active:scale-95 disabled:opacity-40"
         >
           OK
         </button>
@@ -629,7 +629,7 @@ function TagsSheet({
         <div className="p-2 pt-3">
           <button
             onClick={onClose}
-            className="w-full rounded-lg bg-[var(--accent)] px-4 py-2.5 text-[13.5px] font-medium text-[var(--bg)] active:scale-95"
+            className="w-full rounded-lg bg-[var(--accent)] px-4 py-2.5 text-[13.5px] font-medium text-[var(--accent-fg)] active:scale-95"
           >
             Valider
           </button>

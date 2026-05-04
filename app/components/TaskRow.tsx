@@ -21,6 +21,14 @@ type Props = {
 const SWIPE_THRESHOLD = 70;
 const SWIPE_MAX = 120;
 
+const PRIORITY_COLOR: Record<string, string> = {
+  urgent: "bg-rose-500",
+  high: "bg-orange-400",
+  medium: "bg-amber-400",
+  low: "bg-sky-400",
+  none: "bg-transparent",
+};
+
 export default function TaskRow({ task, selected, onToggleSelect, onOpen, trashMode, onRestore, onHardDelete }: Props) {
   const { projects, toggleDone, patchTask, deleteTask } = useStore();
   const project = projects.find((p) => p.id === task.projectId);
@@ -29,7 +37,7 @@ export default function TaskRow({ task, selected, onToggleSelect, onOpen, trashM
   const subTotal = task.subtasks.length;
   const today = todayISO();
   const isToday = task.dueDate === today;
-  const isUrgent = task.priority === "urgent" && !task.done;
+  const isOverdue = task.dueDate && task.dueDate < today && !task.done;
 
   const [swipeX, setSwipeX] = useState(0);
   const [swiping, setSwiping] = useState(false);
@@ -85,11 +93,11 @@ export default function TaskRow({ task, selected, onToggleSelect, onOpen, trashM
 
   return (
     <div className="relative overflow-hidden">
-      {/* Swipe reveals — kept simple, single tone */}
+      {/* Swipe reveals */}
       {swipeX > 0 && (
         <div
-          className={`absolute inset-y-0 left-0 flex items-center gap-2 px-5 text-white transition-opacity ${
-            swipeReady ? "bg-[var(--accent)] opacity-100" : "bg-[var(--accent)] opacity-50"
+          className={`absolute inset-y-0 left-0 flex items-center gap-2 px-5 text-[var(--accent-fg)] transition-opacity ${
+            swipeReady ? "bg-[var(--accent)] opacity-100" : "bg-[var(--accent)] opacity-60"
           }`}
           style={{ width: Math.abs(swipeX) }}
         >
@@ -100,7 +108,7 @@ export default function TaskRow({ task, selected, onToggleSelect, onOpen, trashM
       {swipeX < 0 && (
         <div
           className={`absolute inset-y-0 right-0 flex items-center justify-end gap-2 px-5 text-white transition-opacity ${
-            swipeReady ? "bg-[var(--text-muted)] opacity-100" : "bg-[var(--text-muted)] opacity-50"
+            swipeReady ? "bg-[var(--text)] opacity-100" : "bg-[var(--text)] opacity-50"
           }`}
           style={{ width: Math.abs(swipeX) }}
         >
@@ -115,16 +123,16 @@ export default function TaskRow({ task, selected, onToggleSelect, onOpen, trashM
         onTouchEnd={onTouchEnd}
         style={{
           transform: `translateX(${swipeX}px)`,
-          transition: swiping ? "none" : "transform 0.25s cubic-bezier(0.2, 0.9, 0.3, 1.1)",
-          opacity: 1 - swipeProgress * 0.15,
+          transition: swiping ? "none" : "transform 0.28s cubic-bezier(0.2, 0.9, 0.3, 1)",
+          opacity: 1 - swipeProgress * 0.12,
         }}
         className={`group relative flex items-start gap-3 px-4 py-3.5 transition-colors sm:py-3 ${
           selected
             ? "bg-[var(--accent-soft)]"
-            : "bg-[var(--bg-elev)] touch-active hover:bg-[var(--bg-hover)]/60"
+            : "bg-[var(--bg-elev)] touch-active hover:bg-[var(--bg-hover)]/50"
         }`}
       >
-        {/* Multi-select checkbox (desktop hover) */}
+        {/* Multi-select (desktop hover) */}
         <input
           type="checkbox"
           checked={selected}
@@ -136,21 +144,21 @@ export default function TaskRow({ task, selected, onToggleSelect, onOpen, trashM
           title="Sélectionner"
         />
 
-        {/* Completion checkbox — neutral border */}
+        {/* Completion checkbox — refined */}
         <button
           onClick={(e) => {
             e.stopPropagation();
             haptic("medium");
             toggleDone(task.id);
           }}
-          className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-[1.5px] transition active:scale-90 sm:h-[22px] sm:w-[22px] ${
+          className={`mt-0.5 flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full border-[1.5px] transition active:scale-90 ${
             task.done
               ? "border-[var(--accent)] bg-[var(--accent)] anim-check-pop"
-              : "border-[var(--border-strong)] hover:border-[var(--accent)]"
+              : "border-[var(--border-strong)] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)]"
           }`}
           aria-label={task.done ? "Marquer non fait" : "Marquer fait"}
         >
-          {task.done && <Icon name="check" size={13} className="text-[var(--bg)]" />}
+          {task.done && <Icon name="check" size={12} className="text-[var(--accent-fg)]" />}
         </button>
 
         {/* Content */}
@@ -158,16 +166,19 @@ export default function TaskRow({ task, selected, onToggleSelect, onOpen, trashM
           onClick={() => onOpen(task.id)}
           className="flex min-w-0 flex-1 flex-col items-start gap-1 text-left"
         >
-          <div className="flex w-full items-start gap-1.5">
-            {/* Subtle urgent dot, only for urgent + not done */}
-            {isUrgent && (
-              <span className="mt-[7px] inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500" aria-label="Urgent" />
+          <div className="flex w-full items-start gap-2">
+            {/* Priority dot — only for urgent/high */}
+            {!task.done && (task.priority === "urgent" || task.priority === "high") && (
+              <span
+                className={`mt-[7px] inline-block h-1.5 w-1.5 shrink-0 rounded-full ${PRIORITY_COLOR[task.priority]}`}
+                aria-label={task.priority}
+              />
             )}
             <div
-              className={`min-w-0 flex-1 break-words text-[15px] leading-snug transition sm:text-[14px] ${
+              className={`min-w-0 flex-1 break-words text-[14.5px] font-medium leading-snug transition ${
                 task.done
-                  ? "text-[var(--text-subtle)] line-through"
-                  : "text-[var(--text)]"
+                  ? "text-[var(--text-subtle)] line-through decoration-[1.5px]"
+                  : "text-[var(--text-strong)]"
               }`}
             >
               {task.title}
@@ -175,7 +186,7 @@ export default function TaskRow({ task, selected, onToggleSelect, onOpen, trashM
           </div>
 
           {showMeta && (
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-[var(--text-muted)] sm:text-[11.5px]">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] text-[var(--text-muted)]">
               {task.waiting && (
                 <span className="flex items-center gap-1 italic text-[var(--text-subtle)]">
                   <Icon name="pause" size={10} />
@@ -183,7 +194,7 @@ export default function TaskRow({ task, selected, onToggleSelect, onOpen, trashM
                 </span>
               )}
               {due && (
-                <span className={`flex items-center gap-1 ${due.tone}`}>
+                <span className={`flex items-center gap-1 ${isOverdue ? "font-medium text-rose-600 dark:text-rose-400" : isToday ? "font-medium text-[var(--accent)]" : due.tone}`}>
                   <Icon name="clock" size={10} />
                   {due.label}{task.dueTime ? ` · ${task.dueTime}` : ""}
                 </span>
@@ -200,7 +211,7 @@ export default function TaskRow({ task, selected, onToggleSelect, onOpen, trashM
               {subTotal > 0 && (
                 <span className="flex items-center gap-1.5">
                   <Icon name="list" size={10} />
-                  <span className="tabular-nums">{subDone}/{subTotal}</span>
+                  <span className="num">{subDone}/{subTotal}</span>
                 </span>
               )}
               {task.estimateMinutes && (
@@ -226,7 +237,7 @@ export default function TaskRow({ task, selected, onToggleSelect, onOpen, trashM
             <button
               onClick={(e) => { e.stopPropagation(); onRestore?.(); }}
               title="Restaurer"
-              className="rounded-md px-2 py-1 text-[11px] font-medium text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text)]"
+              className="rounded-md px-2 py-1 text-[11px] font-medium text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--accent)]"
             >
               <span className="flex items-center gap-1">
                 <Icon name="repeat" size={11} />
@@ -243,9 +254,9 @@ export default function TaskRow({ task, selected, onToggleSelect, onOpen, trashM
           </div>
         )}
 
-        {/* Desktop hover actions — minimal, ghost style */}
+        {/* Desktop hover actions */}
         {!task.done && !trashMode && (
-          <div className="invisible absolute right-3 top-1/2 hidden -translate-y-1/2 items-center gap-0.5 group-hover:visible md:flex">
+          <div className="invisible absolute right-3 top-1/2 hidden -translate-y-1/2 items-center gap-0.5 rounded-lg border border-[var(--border)] bg-[var(--bg-elev)] p-0.5 shadow-sm group-hover:visible md:flex">
             {!isToday && !task.waiting && (
               <button
                 onClick={(e) => {
@@ -253,7 +264,7 @@ export default function TaskRow({ task, selected, onToggleSelect, onOpen, trashM
                   patchTask(task.id, { dueDate: today });
                 }}
                 title="Aujourd'hui"
-                className="flex h-7 items-center gap-1 rounded-md px-2 text-[11px] font-medium text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text)]"
+                className="flex h-7 items-center gap-1 rounded-md px-2 text-[11px] font-medium text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--accent)]"
               >
                 <Icon name="sun" size={11} />
                 Aujourd'hui

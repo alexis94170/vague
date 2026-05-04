@@ -264,7 +264,7 @@ export default function AssistantChat({ open, onClose }: Props) {
       >
         <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4 safe-top">
           <div className="flex items-center gap-2">
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--text)] text-[var(--bg)]">
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--accent)] text-[var(--accent-fg)]">
               <Icon name="sparkles" size={14} />
             </span>
             <div>

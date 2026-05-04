@@ -122,14 +122,14 @@ export default function SportsWidget() {
     <section className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-elev)]">
       <button
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center gap-3 px-5 py-4 text-left"
+        className="flex w-full items-center gap-3 px-5 py-4 text-left transition-colors hover:bg-[var(--bg-hover)]/40"
       >
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--bg-hover)] text-[18px]">
-          💪
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)]">
+          <Icon name="activity" size={18} />
         </span>
         <div className="min-w-0 flex-1">
-          <div className="text-[14px] font-semibold text-[var(--text)]">Sport</div>
-          <div className="truncate text-[11.5px] text-[var(--text-muted)]">{subtitle}</div>
+          <div className="text-[14px] font-semibold tracking-tight text-[var(--text-strong)]">Sport</div>
+          <div className="mt-0.5 truncate text-[12px] text-[var(--text-muted)]">{subtitle}</div>
         </div>
         <Icon name="chevron-right" size={14} className={`shrink-0 text-[var(--text-subtle)] transition-transform ${open ? "rotate-90" : ""}`} />
       </button>
@@ -169,7 +169,7 @@ export default function SportsWidget() {
                     onClick={() => setSelType(t.key)}
                     className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-[12px] transition active:scale-95 ${
                       selType === t.key
-                        ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--bg)]"
+                        ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-fg)]"
                         : "border-[var(--border)] bg-[var(--bg-elev)] text-[var(--text-muted)]"
                     }`}
                   >
@@ -185,7 +185,7 @@ export default function SportsWidget() {
                     onClick={() => setSelDuration(d)}
                     className={`rounded-full border px-3 py-1 text-[12px] font-medium transition active:scale-95 ${
                       selDuration === d
-                        ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--bg)]"
+                        ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-fg)]"
                         : "border-[var(--border)] bg-[var(--bg-elev)] text-[var(--text-muted)]"
                     }`}
                   >
@@ -202,7 +202,7 @@ export default function SportsWidget() {
                 </button>
                 <button
                   onClick={addWorkout}
-                  className="ml-auto rounded-full bg-[var(--accent)] px-4 py-1.5 text-[12px] font-semibold text-[var(--bg)] active:scale-95"
+                  className="ml-auto rounded-full bg-[var(--accent)] px-4 py-1.5 text-[12px] font-semibold text-[var(--accent-fg)] active:scale-95"
                 >
                   Enregistrer
                 </button>
