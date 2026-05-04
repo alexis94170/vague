@@ -15,12 +15,12 @@ type CachedSuggestions = {
 };
 
 const KIND_META: Record<Suggestion["kind"], { icon: IconName; color: string; label: string }> = {
-  focus: { icon: "flag", color: "text-rose-500", label: "À traiter" },
-  reschedule: { icon: "calendar", color: "text-amber-500", label: "À dater" },
-  followup: { icon: "repeat", color: "text-sky-500", label: "À relancer" },
-  cleanup: { icon: "trash", color: "text-zinc-500", label: "À nettoyer" },
-  waiting: { icon: "pause", color: "text-yellow-600", label: "En attente" },
-  insight: { icon: "sparkles", color: "text-indigo-500", label: "Insight" },
+  focus: { icon: "flag", color: "text-[var(--text-muted)]", label: "À traiter" },
+  reschedule: { icon: "calendar", color: "text-[var(--text-muted)]", label: "À dater" },
+  followup: { icon: "repeat", color: "text-[var(--text-muted)]", label: "À relancer" },
+  cleanup: { icon: "trash", color: "text-[var(--text-muted)]", label: "À nettoyer" },
+  waiting: { icon: "pause", color: "text-[var(--text-muted)]", label: "En attente" },
+  insight: { icon: "sparkles", color: "text-[var(--text-muted)]", label: "Insight" },
 };
 
 const ACTION_LABEL: Record<Suggestion["action"], string> = {
@@ -115,7 +115,7 @@ export default function SuggestionsPanel() {
     return (
       <button
         onClick={generate}
-        className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-[var(--accent)]/40 bg-[var(--accent-soft)] px-4 py-3 text-[13px] font-medium text-[var(--accent)] transition hover:bg-[var(--accent-soft-2)] active:scale-[0.98]"
+        className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-[var(--border)] bg-transparent px-4 py-3 text-[13px] font-medium text-[var(--text-muted)] transition hover:border-[var(--accent)]/40 hover:text-[var(--accent)] active:scale-[0.98]"
       >
         <Icon name="sparkles" size={14} />
         Demander des suggestions à l&apos;IA
@@ -127,8 +127,8 @@ export default function SuggestionsPanel() {
     <section className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-elev)]">
       <header className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 text-white">
-            <Icon name="sparkles" size={12} />
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[var(--text)] text-[var(--bg)]">
+            <Icon name="sparkles" size={11} />
           </span>
           <div className="min-w-0">
             <div className="text-[13px] font-semibold">Suggestions</div>
@@ -207,7 +207,7 @@ export default function SuggestionsPanel() {
                   {s.action !== "none" && (
                     <button
                       onClick={() => applyAction(s, idx)}
-                      className="rounded-md bg-[var(--accent)] px-2.5 py-1 text-[11.5px] font-medium text-white transition active:scale-95"
+                      className="rounded-full bg-[var(--accent)] px-3 py-1 text-[11.5px] font-medium text-[var(--bg)] transition active:scale-95"
                     >
                       {ACTION_LABEL[s.action]}
                     </button>

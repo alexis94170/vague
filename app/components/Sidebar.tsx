@@ -109,12 +109,12 @@ export default function Sidebar({
     <aside className="flex h-screen w-64 shrink-0 flex-col border-r border-[var(--border)] bg-[var(--bg-elev)] md:bg-[var(--bg)]/80 md:backdrop-blur">
       <div className="flex items-center justify-between px-5 py-5">
         <div className="flex items-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-sm">
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <div className="flex h-6 w-6 items-center justify-center rounded-md bg-[var(--text)] text-[var(--bg)]">
+            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M3 12c2-4 5-4 7 0s5 4 7 0 4-4 4-4" />
             </svg>
           </div>
-          <h1 className="text-[15px] font-semibold tracking-tight">Vague</h1>
+          <h1 className="text-[14px] font-semibold tracking-tight">Vague</h1>
         </div>
         <button
           onClick={onOpenPalette}
@@ -146,16 +146,16 @@ export default function Sidebar({
                   onClick={() => onViewChange({ kind: item.kind } as ViewKind)}
                   className={`group flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-[13px] transition ${
                     active
-                      ? "bg-[var(--accent-soft)] font-medium text-[var(--accent)]"
+                      ? "bg-[var(--bg-hover)] font-medium text-[var(--text)]"
                       : "text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text)]"
                   }`}
                 >
                   <span className="flex items-center gap-2.5">
-                    <Icon name={item.icon} size={15} className={active ? "" : "text-[var(--text-subtle)] group-hover:text-[var(--text-muted)]"} />
+                    <Icon name={item.icon} size={14} className={active ? "text-[var(--text)]" : "text-[var(--text-subtle)] group-hover:text-[var(--text-muted)]"} />
                     <span>{item.label}</span>
                   </span>
                   {count > 0 && (
-                    <span className={`text-[11px] tabular-nums ${active ? "text-[var(--accent)]/70" : "text-[var(--text-subtle)]"}`}>
+                    <span className="text-[11px] tabular-nums text-[var(--text-subtle)]">
                       {count}
                     </span>
                   )}
@@ -352,7 +352,7 @@ export default function Sidebar({
             onClick={() => setMenuOpen(!menuOpen)}
             className="flex w-full items-center gap-2.5 rounded-md px-1.5 py-1.5 text-left text-[12px] transition hover:bg-[var(--bg-hover)]"
           >
-            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 text-[10px] font-semibold text-white">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--text)] text-[10px] font-semibold text-[var(--bg)]">
               {(user.email ?? "?").slice(0, 1).toUpperCase()}
             </span>
             <span className="min-w-0 flex-1">

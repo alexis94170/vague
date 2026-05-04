@@ -124,7 +124,7 @@ export default function SportsWidget() {
         onClick={() => setOpen(!open)}
         className="flex w-full items-center gap-3 px-5 py-4 text-left"
       >
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 text-[18px]">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--bg-hover)] text-[18px]">
           💪
         </span>
         <div className="min-w-0 flex-1">
@@ -169,7 +169,7 @@ export default function SportsWidget() {
                     onClick={() => setSelType(t.key)}
                     className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-[12px] transition active:scale-95 ${
                       selType === t.key
-                        ? "border-[var(--accent)] bg-[var(--accent)] text-white"
+                        ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--bg)]"
                         : "border-[var(--border)] bg-[var(--bg-elev)] text-[var(--text-muted)]"
                     }`}
                   >
@@ -185,7 +185,7 @@ export default function SportsWidget() {
                     onClick={() => setSelDuration(d)}
                     className={`rounded-full border px-3 py-1 text-[12px] font-medium transition active:scale-95 ${
                       selDuration === d
-                        ? "border-[var(--accent)] bg-[var(--accent)] text-white"
+                        ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--bg)]"
                         : "border-[var(--border)] bg-[var(--bg-elev)] text-[var(--text-muted)]"
                     }`}
                   >
@@ -202,7 +202,7 @@ export default function SportsWidget() {
                 </button>
                 <button
                   onClick={addWorkout}
-                  className="ml-auto rounded-full bg-[var(--accent)] px-4 py-1.5 text-[12px] font-semibold text-white active:scale-95"
+                  className="ml-auto rounded-full bg-[var(--accent)] px-4 py-1.5 text-[12px] font-semibold text-[var(--bg)] active:scale-95"
                 >
                   Enregistrer
                 </button>

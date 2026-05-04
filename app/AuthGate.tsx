@@ -8,7 +8,7 @@ function Splash() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-[var(--bg)]">
       <div className="flex flex-col items-center gap-3 anim-fade-in">
-        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-lg">
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--text)] text-[var(--bg)]">
           <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M3 12c2-4 5-4 7 0s5 4 7 0 4-4 4-4" />
           </svg>

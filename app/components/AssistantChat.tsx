@@ -264,8 +264,8 @@ export default function AssistantChat({ open, onClose }: Props) {
       >
         <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4 safe-top">
           <div className="flex items-center gap-2">
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 text-white">
-              <Icon name="sparkles" size={15} />
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--text)] text-[var(--bg)]">
+              <Icon name="sparkles" size={14} />
             </span>
             <div>
               <h2 className="text-[15px] font-semibold leading-tight">Assistant Vague</h2>

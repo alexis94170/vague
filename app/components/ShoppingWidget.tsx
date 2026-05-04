@@ -99,7 +99,7 @@ export default function ShoppingWidget() {
         onClick={() => setOpen(!open)}
         className="flex w-full items-center gap-3 px-5 py-4 text-left"
       >
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-orange-500/10 text-[18px]">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--bg-hover)] text-[18px]">
           🛒
         </span>
         <div className="min-w-0 flex-1">
@@ -132,7 +132,7 @@ export default function ShoppingWidget() {
             {input.trim() && (
               <button
                 onClick={() => add(input)}
-                className="rounded-lg bg-[var(--accent)] px-2.5 py-0.5 text-[11px] font-semibold text-white"
+                className="rounded-lg bg-[var(--accent)] px-2.5 py-0.5 text-[11px] font-semibold text-[var(--bg)]"
               >
                 OK
               </button>
@@ -192,7 +192,7 @@ export default function ShoppingWidget() {
                   <div key={it.id} className="group flex items-center gap-2 rounded-md px-1.5 py-1.5">
                     <button
                       onClick={() => toggle(it.id)}
-                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-white"
+                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--bg)]"
                     >
                       <Icon name="check" size={11} />
                     </button>

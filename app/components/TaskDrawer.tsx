@@ -88,7 +88,7 @@ export default function TaskDrawer({ taskId, onClose, onFocus }: Props) {
               <button
                 onClick={() => onFocus(draft.id)}
                 title="Mode focus"
-                className="flex items-center gap-1 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 px-2.5 py-1 text-[11.5px] font-medium text-white shadow-sm"
+                className="flex items-center gap-1 rounded-full bg-[var(--text)] px-2.5 py-1 text-[11.5px] font-medium text-[var(--bg)]"
               >
                 <Icon name="sparkles" size={11} />
                 Focus
@@ -126,7 +126,7 @@ export default function TaskDrawer({ taskId, onClose, onFocus }: Props) {
                   : "border-[var(--border-strong)] hover:border-[var(--accent)]"
               }`}
             >
-              {draft.done && <Icon name="check" size={13} className="text-white" />}
+              {draft.done && <Icon name="check" size={13} className="text-[var(--bg)]" />}
             </button>
             <textarea
               value={draft.title}
@@ -153,10 +153,10 @@ export default function TaskDrawer({ taskId, onClose, onFocus }: Props) {
                   startPomodoro({ taskId: draft.id, taskTitle: draft.title, minutes: draft.estimateMinutes && draft.estimateMinutes <= 60 ? draft.estimateMinutes : 25 });
                   onClose();
                 }}
-                className="flex items-center gap-1.5 rounded-lg bg-gradient-to-br from-rose-500 to-orange-500 px-3 py-1.5 text-[12px] font-medium text-white transition active:scale-95"
+                className="flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--bg)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-muted)] transition hover:border-[var(--accent)]/40 hover:text-[var(--accent)] active:scale-95"
                 title="Démarrer un focus sur cette tâche"
               >
-                <Icon name="clock" size={13} />
+                <Icon name="clock" size={12} />
                 Focus {draft.estimateMinutes && draft.estimateMinutes <= 60 ? `(${draft.estimateMinutes} min)` : "(25 min)"}
               </button>
             </div>
@@ -236,9 +236,9 @@ export default function TaskDrawer({ taskId, onClose, onFocus }: Props) {
                   waiting: e.target.checked,
                   waitingFor: e.target.checked ? draft.waitingFor : undefined,
                 })}
-                className="h-4 w-4 accent-amber-500"
+                className="h-4 w-4 accent-[var(--accent)]"
               />
-              <Icon name="pause" size={13} className="text-amber-500" />
+              <Icon name="pause" size={13} className="text-[var(--text-muted)]" />
               <span className="text-[13px] font-medium">En attente</span>
             </label>
             {draft.waiting && (
@@ -246,7 +246,7 @@ export default function TaskDrawer({ taskId, onClose, onFocus }: Props) {
                 value={draft.waitingFor ?? ""}
                 onChange={(e) => save({ waitingFor: e.target.value || undefined })}
                 placeholder="En attente de quoi / qui ?"
-                className="mt-2 w-full rounded-md border border-[var(--border)] bg-[var(--bg-elev)] px-2.5 py-1.5 text-[13px] outline-none focus:border-amber-400"
+                className="mt-2 w-full rounded-md border border-[var(--border)] bg-[var(--bg-elev)] px-2.5 py-1.5 text-[13px] outline-none focus:border-[var(--accent)]/50"
               />
             )}
           </div>
@@ -412,7 +412,7 @@ function SubtaskList({
                       : "border-[var(--border-strong)] hover:border-[var(--accent)]"
                   }`}
                 >
-                  {s.done && <Icon name="check" size={10} className="text-white" />}
+                  {s.done && <Icon name="check" size={10} className="text-[var(--bg)]" />}
                 </button>
                 <input
                   value={s.title}
@@ -489,7 +489,7 @@ function SectionAdd({ onAdd }: { onAdd: (name: string) => void }) {
         <button
           type="button"
           onClick={submit}
-          className="rounded-md bg-[var(--accent)] px-2 py-0.5 text-[10.5px] font-medium text-white"
+          className="rounded-md bg-[var(--accent)] px-2 py-0.5 text-[10.5px] font-medium text-[var(--bg)]"
         >
           OK
         </button>
@@ -589,7 +589,7 @@ function SubtaskAdd({ onAdd, placeholder = "Ajouter une sous-tâche" }: { onAdd:
         <button
           type="button"
           onClick={submit}
-          className="rounded-md bg-[var(--accent)] px-2 py-0.5 text-[10.5px] font-medium text-white"
+          className="rounded-md bg-[var(--accent)] px-2 py-0.5 text-[10.5px] font-medium text-[var(--bg)]"
         >
           OK
         </button>

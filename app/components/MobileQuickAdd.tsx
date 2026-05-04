@@ -150,7 +150,7 @@ export default function MobileQuickAdd({ open, onClose, view }: Props) {
         <button
           onClick={submit}
           disabled={!title.trim()}
-          className="no-select rounded-full bg-[var(--accent)] px-4 py-1.5 text-[13px] font-semibold text-white transition active:scale-95 disabled:opacity-40"
+          className="no-select rounded-full bg-[var(--accent)] px-4 py-1.5 text-[13px] font-semibold text-[var(--bg)] transition active:scale-95 disabled:opacity-40"
         >
           OK
         </button>
@@ -311,8 +311,8 @@ function Pill({
       onClick={onClick}
       className={`no-select flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12.5px] transition active:scale-95 ${
         active
-          ? "border-[var(--accent)]/30 bg-[var(--accent-soft)] text-[var(--accent)] font-medium"
-          : "border-[var(--border)] bg-[var(--bg)] text-[var(--text-muted)]"
+          ? "border-[var(--accent)]/40 bg-[var(--accent-soft)] text-[var(--text)] font-medium"
+          : "border-[var(--border)] bg-transparent text-[var(--text-muted)]"
       }`}
     >
       {color ? (
@@ -596,9 +596,9 @@ function TagsSheet({
         {value.length > 0 && (
           <div className="flex flex-wrap gap-1.5 px-2 pb-2">
             {value.map((t) => (
-              <span key={t} className="flex items-center gap-1 rounded-full bg-teal-500/10 px-2.5 py-1 text-[12px] font-medium text-teal-600 dark:text-teal-300">
+              <span key={t} className="flex items-center gap-1 rounded-full bg-[var(--bg-hover)] px-2.5 py-1 text-[12px] font-medium text-[var(--text-muted)]">
                 #{t}
-                <button onClick={() => remove(t)} className="rounded-full p-0.5 active:bg-teal-500/20"><Icon name="x" size={10} /></button>
+                <button onClick={() => remove(t)} className="rounded-full p-0.5 text-[var(--text-subtle)] active:bg-[var(--border)]"><Icon name="x" size={10} /></button>
               </span>
             ))}
           </div>
@@ -629,7 +629,7 @@ function TagsSheet({
         <div className="p-2 pt-3">
           <button
             onClick={onClose}
-            className="w-full rounded-lg bg-[var(--accent)] px-4 py-2.5 text-[13.5px] font-medium text-white active:scale-95"
+            className="w-full rounded-lg bg-[var(--accent)] px-4 py-2.5 text-[13.5px] font-medium text-[var(--bg)] active:scale-95"
           >
             Valider
           </button>

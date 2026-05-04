@@ -18,22 +18,6 @@ type Props = {
   onHardDelete?: () => void;
 };
 
-const PRIORITY_ACCENT: Record<string, string> = {
-  urgent: "bg-rose-500",
-  high: "bg-orange-500",
-  medium: "bg-amber-500",
-  low: "bg-sky-500",
-  none: "bg-transparent",
-};
-
-const PRIORITY_CHECKBOX: Record<string, string> = {
-  urgent: "border-rose-400",
-  high: "border-orange-400",
-  medium: "border-amber-400",
-  low: "border-sky-400",
-  none: "border-[var(--border-strong)]",
-};
-
 const SWIPE_THRESHOLD = 70;
 const SWIPE_MAX = 120;
 
@@ -45,6 +29,7 @@ export default function TaskRow({ task, selected, onToggleSelect, onOpen, trashM
   const subTotal = task.subtasks.length;
   const today = todayISO();
   const isToday = task.dueDate === today;
+  const isUrgent = task.priority === "urgent" && !task.done;
 
   const [swipeX, setSwipeX] = useState(0);
   const [swiping, setSwiping] = useState(false);
@@ -88,7 +73,6 @@ export default function TaskRow({ task, selected, onToggleSelect, onOpen, trashM
       toggleDone(task.id);
     } else if (swipeX <= -SWIPE_THRESHOLD) {
       haptic("medium");
-      // snooze to tomorrow by default
       patchTask(task.id, { dueDate: addDays(todayISO(), 1) });
     }
     setSwipeX(0);
@@ -101,17 +85,27 @@ export default function TaskRow({ task, selected, onToggleSelect, onOpen, trashM
 
   return (
     <div className="relative overflow-hidden">
-      {/* Swipe background reveals */}
+      {/* Swipe reveals — kept simple, single tone */}
       {swipeX > 0 && (
-        <div className={`absolute inset-y-0 left-0 flex items-center gap-2 px-5 text-white transition-colors ${swipeReady ? "bg-emerald-500" : "bg-emerald-500/60"}`} style={{ width: Math.abs(swipeX) }}>
-          <Icon name="check" size={22} />
-          {swipeReady && <span className="text-[13px] font-semibold">Fait</span>}
+        <div
+          className={`absolute inset-y-0 left-0 flex items-center gap-2 px-5 text-white transition-opacity ${
+            swipeReady ? "bg-[var(--accent)] opacity-100" : "bg-[var(--accent)] opacity-50"
+          }`}
+          style={{ width: Math.abs(swipeX) }}
+        >
+          <Icon name="check" size={20} />
+          {swipeReady && <span className="text-[12.5px] font-medium">Fait</span>}
         </div>
       )}
       {swipeX < 0 && (
-        <div className={`absolute inset-y-0 right-0 flex items-center justify-end gap-2 px-5 text-white transition-colors ${swipeReady ? "bg-sky-500" : "bg-sky-500/60"}`} style={{ width: Math.abs(swipeX) }}>
-          {swipeReady && <span className="text-[13px] font-semibold">Demain</span>}
-          <Icon name="arrow-right" size={22} />
+        <div
+          className={`absolute inset-y-0 right-0 flex items-center justify-end gap-2 px-5 text-white transition-opacity ${
+            swipeReady ? "bg-[var(--text-muted)] opacity-100" : "bg-[var(--text-muted)] opacity-50"
+          }`}
+          style={{ width: Math.abs(swipeX) }}
+        >
+          {swipeReady && <span className="text-[12.5px] font-medium">Demain</span>}
+          <Icon name="arrow-right" size={20} />
         </div>
       )}
 
@@ -124,34 +118,25 @@ export default function TaskRow({ task, selected, onToggleSelect, onOpen, trashM
           transition: swiping ? "none" : "transform 0.25s cubic-bezier(0.2, 0.9, 0.3, 1.1)",
           opacity: 1 - swipeProgress * 0.15,
         }}
-        className={`group relative flex items-start gap-3 px-4 py-3.5 transition-colors sm:gap-3 sm:px-4 sm:py-3 ${
+        className={`group relative flex items-start gap-3 px-4 py-3.5 transition-colors sm:py-3 ${
           selected
             ? "bg-[var(--accent-soft)]"
-            : task.waiting
-              ? "bg-amber-500/5"
-              : "bg-[var(--bg-elev)] touch-active hover:bg-[var(--bg-hover)]/60"
+            : "bg-[var(--bg-elev)] touch-active hover:bg-[var(--bg-hover)]/60"
         }`}
       >
-        {/* Priority accent bar */}
-        <div
-          className={`absolute left-0 top-0 h-full w-[3px] ${
-            task.waiting ? "bg-amber-500 opacity-90" : `${PRIORITY_ACCENT[task.priority]} ${task.priority === "none" ? "opacity-0" : "opacity-90"}`
-          }`}
-        />
-
-        {/* Multi-select checkbox (desktop hover only) */}
+        {/* Multi-select checkbox (desktop hover) */}
         <input
           type="checkbox"
           checked={selected}
           onChange={(e) => onToggleSelect(task.id, (e.nativeEvent as MouseEvent).shiftKey)}
           onClick={(e) => e.stopPropagation()}
           className={`mt-1.5 hidden h-4 w-4 shrink-0 cursor-pointer accent-[var(--accent)] transition-opacity md:inline-block ${
-            selected ? "opacity-100" : "opacity-0 group-hover:opacity-60"
+            selected ? "opacity-100" : "opacity-0 group-hover:opacity-50"
           }`}
           title="Sélectionner"
         />
 
-        {/* Completion checkbox */}
+        {/* Completion checkbox — neutral border */}
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -161,78 +146,76 @@ export default function TaskRow({ task, selected, onToggleSelect, onOpen, trashM
           className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-[1.5px] transition active:scale-90 sm:h-[22px] sm:w-[22px] ${
             task.done
               ? "border-[var(--accent)] bg-[var(--accent)] anim-check-pop"
-              : `${PRIORITY_CHECKBOX[task.priority]} hover:border-[var(--accent)]`
+              : "border-[var(--border-strong)] hover:border-[var(--accent)]"
           }`}
           aria-label={task.done ? "Marquer non fait" : "Marquer fait"}
         >
-          {task.done && <Icon name="check" size={13} className="text-white" />}
+          {task.done && <Icon name="check" size={13} className="text-[var(--bg)]" />}
         </button>
 
         {/* Content */}
         <button
           onClick={() => onOpen(task.id)}
-          className="flex min-w-0 flex-1 flex-col items-start gap-1.5 text-left sm:gap-1"
+          className="flex min-w-0 flex-1 flex-col items-start gap-1 text-left"
         >
-          <div
-            className={`w-full break-words text-[15px] leading-snug transition sm:text-[14px] ${
-              task.done
-                ? "text-[var(--text-subtle)] line-through"
-                : "text-[var(--text)]"
-            }`}
-          >
-            {task.title}
+          <div className="flex w-full items-start gap-1.5">
+            {/* Subtle urgent dot, only for urgent + not done */}
+            {isUrgent && (
+              <span className="mt-[7px] inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500" aria-label="Urgent" />
+            )}
+            <div
+              className={`min-w-0 flex-1 break-words text-[15px] leading-snug transition sm:text-[14px] ${
+                task.done
+                  ? "text-[var(--text-subtle)] line-through"
+                  : "text-[var(--text)]"
+              }`}
+            >
+              {task.title}
+            </div>
           </div>
 
           {showMeta && (
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-[var(--text-muted)] sm:text-[11.5px]">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-[var(--text-muted)] sm:text-[11.5px]">
               {task.waiting && (
-                <span className="flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 font-medium text-amber-700 ring-1 ring-inset ring-amber-500/20 dark:text-amber-300">
+                <span className="flex items-center gap-1 italic text-[var(--text-subtle)]">
                   <Icon name="pause" size={10} />
                   {task.waitingFor ? task.waitingFor : "En attente"}
                 </span>
               )}
               {due && (
-                <span className={`flex items-center gap-1 font-medium ${due.tone}`}>
-                  <Icon name="clock" size={11} />
+                <span className={`flex items-center gap-1 ${due.tone}`}>
+                  <Icon name="clock" size={10} />
                   {due.label}{task.dueTime ? ` · ${task.dueTime}` : ""}
                 </span>
               )}
               {project && project.id !== "inbox" && (
                 <span className="flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full" style={{ background: project.color }} />
+                  <span className="h-1.5 w-1.5 rounded-full" style={{ background: project.color }} />
                   {project.name}
                 </span>
               )}
               {task.tags.map((t) => (
-                <span key={t} className="text-teal-600 dark:text-teal-400">#{t}</span>
+                <span key={t} className="text-[var(--text-subtle)]">#{t}</span>
               ))}
               {subTotal > 0 && (
                 <span className="flex items-center gap-1.5">
                   <Icon name="list" size={10} />
                   <span className="tabular-nums">{subDone}/{subTotal}</span>
-                  <span className="relative inline-block h-1 w-10 overflow-hidden rounded-full bg-[var(--bg-hover)]">
-                    <span
-                      className={`absolute inset-y-0 left-0 rounded-full ${
-                        subDone === subTotal ? "bg-emerald-500" : "bg-[var(--accent)]"
-                      }`}
-                      style={{ width: `${(subDone / subTotal) * 100}%` }}
-                    />
-                  </span>
                 </span>
               )}
               {task.estimateMinutes && (
-                <span className="flex items-center gap-1 text-sky-600 dark:text-sky-400">
+                <span className="flex items-center gap-1">
                   <Icon name="clock" size={10} />
                   {formatEstimate(task.estimateMinutes)}
                 </span>
               )}
               {task.recurrence && (
-                <span className="flex items-center gap-1 text-violet-600 dark:text-violet-400">
+                <span className="flex items-center gap-1">
                   <Icon name="repeat" size={10} />
                   {formatRecurrence(task.recurrence)}
                 </span>
               )}
-              {task.notes && <Icon name="note" size={11} className="text-[var(--text-subtle)]" />}
+              {task.notes && <Icon name="note" size={10} className="text-[var(--text-subtle)]" />}
             </div>
           )}
         </button>
@@ -243,7 +226,7 @@ export default function TaskRow({ task, selected, onToggleSelect, onOpen, trashM
             <button
               onClick={(e) => { e.stopPropagation(); onRestore?.(); }}
               title="Restaurer"
-              className="rounded-lg border border-[var(--border)] bg-[var(--bg-elev)] px-2 py-1 text-[11px] font-medium text-[var(--text-muted)] hover:border-emerald-400/50 hover:text-emerald-600"
+              className="rounded-md px-2 py-1 text-[11px] font-medium text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text)]"
             >
               <span className="flex items-center gap-1">
                 <Icon name="repeat" size={11} />
@@ -253,16 +236,16 @@ export default function TaskRow({ task, selected, onToggleSelect, onOpen, trashM
             <button
               onClick={(e) => { e.stopPropagation(); onHardDelete?.(); }}
               title="Supprimer définitivement"
-              className="rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-[11px] font-medium text-rose-700 hover:bg-rose-100 dark:border-rose-900/50 dark:bg-rose-900/30 dark:text-rose-300"
+              className="rounded-md px-2 py-1 text-[var(--text-subtle)] hover:bg-[var(--bg-hover)] hover:text-rose-600"
             >
-              <Icon name="trash" size={11} />
+              <Icon name="trash" size={12} />
             </button>
           </div>
         )}
 
-        {/* Desktop hover actions */}
+        {/* Desktop hover actions — minimal, ghost style */}
         {!task.done && !trashMode && (
-          <div className="invisible absolute right-3 top-1/2 hidden -translate-y-1/2 items-center gap-1 group-hover:visible md:flex">
+          <div className="invisible absolute right-3 top-1/2 hidden -translate-y-1/2 items-center gap-0.5 group-hover:visible md:flex">
             {!isToday && !task.waiting && (
               <button
                 onClick={(e) => {
@@ -270,12 +253,10 @@ export default function TaskRow({ task, selected, onToggleSelect, onOpen, trashM
                   patchTask(task.id, { dueDate: today });
                 }}
                 title="Aujourd'hui"
-                className="rounded-lg border border-[var(--border)] bg-[var(--bg-elev)] px-2 py-1 text-[11px] font-medium text-[var(--text-muted)] shadow-sm transition hover:border-[var(--accent)]/40 hover:text-[var(--accent)]"
+                className="flex h-7 items-center gap-1 rounded-md px-2 text-[11px] font-medium text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text)]"
               >
-                <span className="flex items-center gap-1">
-                  <Icon name="sun" size={11} />
-                  Aujourd'hui
-                </span>
+                <Icon name="sun" size={11} />
+                Aujourd'hui
               </button>
             )}
             <button
@@ -289,16 +270,10 @@ export default function TaskRow({ task, selected, onToggleSelect, onOpen, trashM
                 }
               }}
               title={task.waiting ? "Reprendre" : "Mettre en attente"}
-              className={`rounded-lg border px-2 py-1 text-[11px] font-medium shadow-sm transition ${
-                task.waiting
-                  ? "border-amber-400/50 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-300"
-                  : "border-[var(--border)] bg-[var(--bg-elev)] text-[var(--text-muted)] hover:border-amber-400/50 hover:text-amber-600"
-              }`}
+              className="flex h-7 items-center gap-1 rounded-md px-2 text-[11px] font-medium text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text)]"
             >
-              <span className="flex items-center gap-1">
-                <Icon name="pause" size={11} />
-                {task.waiting ? "Reprendre" : "Attendre"}
-              </span>
+              <Icon name="pause" size={11} />
+              {task.waiting ? "Reprendre" : "Attendre"}
             </button>
             <button
               onClick={(e) => {
@@ -306,7 +281,7 @@ export default function TaskRow({ task, selected, onToggleSelect, onOpen, trashM
                 if (confirm(`Supprimer "${task.title}" ?`)) deleteTask(task.id);
               }}
               title="Supprimer"
-              className="rounded-lg border border-[var(--border)] bg-[var(--bg-elev)] px-2 py-1 text-[11px] font-medium text-[var(--text-muted)] shadow-sm transition hover:border-rose-400/50 hover:text-rose-600"
+              className="flex h-7 w-7 items-center justify-center rounded-md text-[var(--text-subtle)] hover:bg-[var(--bg-hover)] hover:text-rose-600"
             >
               <Icon name="trash" size={11} />
             </button>

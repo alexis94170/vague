@@ -43,7 +43,7 @@ export default function BottomNav({ view, onViewChange, onOpenMore }: Props) {
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--border)] glass-bottom safe-bottom md:hidden">
-      <div className="flex h-[58px] items-stretch px-1">
+      <div className="flex h-[56px] items-stretch">
         {ITEMS.map((item) => {
           const active = isActive(item.kind);
           const count =
@@ -55,37 +55,31 @@ export default function BottomNav({ view, onViewChange, onOpenMore }: Props) {
             <button
               key={item.kind}
               onClick={() => onViewChange({ kind: item.kind } as ViewKind)}
-              className={`no-select tappable relative flex flex-1 flex-col items-center justify-center gap-0.5 rounded-xl transition active:scale-95 ${
-                active ? "text-[var(--accent)]" : "text-[var(--text-muted)]"
+              className={`no-select tappable relative flex flex-1 flex-col items-center justify-center gap-0.5 transition active:scale-95 ${
+                active ? "text-[var(--text)]" : "text-[var(--text-subtle)]"
               }`}
             >
-              <div className="relative flex h-7 items-center justify-center">
-                {active && (
-                  <span className="absolute inset-x-1 inset-y-0 rounded-full bg-[var(--accent-soft)]" aria-hidden />
+              <span className="relative flex items-center justify-center">
+                <Icon name={item.icon} size={20} />
+                {count > 0 && (
+                  <span className="absolute -right-2 -top-1 flex h-[14px] min-w-[14px] items-center justify-center rounded-full bg-[var(--text)] px-1 text-[9px] font-semibold tabular-nums text-[var(--bg)]">
+                    {count > 99 ? "99+" : count}
+                  </span>
                 )}
-                <span className="relative">
-                  <Icon name={item.icon} size={22} />
-                  {count > 0 && (
-                    <span className={`absolute -right-2.5 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[9px] font-bold tabular-nums ${
-                      active ? "bg-[var(--accent)] text-white" : "bg-rose-500 text-white"
-                    }`}>
-                      {count > 99 ? "99+" : count}
-                    </span>
-                  )}
-                </span>
-              </div>
-              <span className={`text-[10px] font-medium ${active ? "font-semibold" : ""}`}>{item.label}</span>
+              </span>
+              <span className="text-[9.5px] font-medium tracking-tight">{item.label}</span>
+              {active && (
+                <span className="absolute inset-x-6 top-0 h-[2px] rounded-full bg-[var(--accent)]" aria-hidden />
+              )}
             </button>
           );
         })}
         <button
           onClick={onOpenMore}
-          className="no-select tappable flex flex-1 flex-col items-center justify-center gap-0.5 rounded-xl text-[var(--text-muted)] transition active:scale-95"
+          className="no-select tappable flex flex-1 flex-col items-center justify-center gap-0.5 text-[var(--text-subtle)] transition active:scale-95"
         >
-          <div className="flex h-7 items-center justify-center">
-            <Icon name="menu" size={22} />
-          </div>
-          <span className="text-[10px] font-medium">Menu</span>
+          <Icon name="menu" size={20} />
+          <span className="text-[9.5px] font-medium tracking-tight">Menu</span>
         </button>
       </div>
     </nav>

@@ -233,7 +233,7 @@ export default function QuickAdd({ view, onSubmitted, autoFocus }: Props) {
         <button
           type="submit"
           disabled={!title.trim()}
-          className="ml-auto rounded-md bg-[var(--accent)] px-3 py-1 text-[12px] font-medium text-white transition hover:bg-[var(--accent-hover)] disabled:opacity-40"
+          className="ml-auto rounded-full bg-[var(--accent)] px-3.5 py-1 text-[12px] font-medium text-[var(--bg)] transition hover:bg-[var(--accent-hover)] disabled:opacity-40"
         >
           Ajouter
         </button>
@@ -266,10 +266,10 @@ function Pill({
       <button
         type="button"
         onClick={onClick}
-        className={`flex items-center gap-1.5 rounded-md border px-2 py-1 text-[12px] transition ${
+        className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] transition ${
           active
-            ? "border-[var(--accent)]/30 bg-[var(--accent-soft)] text-[var(--accent)]"
-            : "border-[var(--border)] bg-[var(--bg-elev)] text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:text-[var(--text)]"
+            ? "border-[var(--accent)]/40 bg-[var(--accent-soft)] text-[var(--text)]"
+            : "border-[var(--border)] bg-transparent text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:text-[var(--text)]"
         }`}
       >
         {color ? (
@@ -504,9 +504,9 @@ function TagsPopover({
       {value.length > 0 && (
         <div className="mb-1 flex flex-wrap gap-1 px-1 pb-1">
           {value.map((t) => (
-            <span key={t} className="flex items-center gap-1 rounded-md bg-teal-500/10 px-1.5 py-0.5 text-[11px] text-teal-600 dark:text-teal-300">
+            <span key={t} className="flex items-center gap-1 rounded-md bg-[var(--bg-hover)] px-1.5 py-0.5 text-[11px] text-[var(--text-muted)]">
               #{t}
-              <button type="button" onClick={() => remove(t)} className="text-teal-700/60 hover:text-teal-800 dark:text-teal-300/60">
+              <button type="button" onClick={() => remove(t)} className="text-[var(--text-subtle)] hover:text-[var(--text)]">
                 <Icon name="x" size={9} />
               </button>
             </span>

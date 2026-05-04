@@ -131,20 +131,20 @@ export default function Home() {
               <div className="mt-0.5 text-[12.5px] text-[var(--text-muted)]">{subtitle}</div>
             </div>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1">
             {view.kind === "today" && (
               <button
                 onClick={() => setPlanOpen(true)}
-                className="flex items-center gap-1.5 rounded-md bg-gradient-to-br from-indigo-500 to-violet-600 px-3 py-1.5 text-[12px] font-medium text-white shadow-sm transition active:scale-95"
+                className="flex items-center gap-1.5 rounded-full bg-[var(--text)] px-3.5 py-1.5 text-[12px] font-medium text-[var(--bg)] transition active:scale-95"
               >
-                <Icon name="sparkles" size={13} />
-                Planifier ma journée
+                <Icon name="sparkles" size={12} />
+                Planifier
               </button>
             )}
             <button
               onClick={() => setChatOpen(true)}
               title="Assistant IA"
-              className="flex h-9 items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--bg-elev)] px-2.5 text-[12px] font-medium text-[var(--text-muted)] transition hover:border-[var(--accent)]/40 hover:text-[var(--accent)]"
+              className="flex h-9 items-center gap-1.5 rounded-full px-3 text-[12px] font-medium text-[var(--text-muted)] transition hover:bg-[var(--bg-hover)] hover:text-[var(--text)]"
             >
               <Icon name="sparkles" size={13} />
               Assistant
@@ -153,17 +153,17 @@ export default function Home() {
               <button
                 onClick={() => setTodayPickerOpen(true)}
                 title="Ajouter des tâches existantes"
-                className="hidden items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--bg-elev)] px-2.5 py-1.5 text-[12px] font-medium text-[var(--text-muted)] transition hover:border-[var(--accent)]/40 hover:text-[var(--accent)] md:flex"
+                className="hidden items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-medium text-[var(--text-muted)] transition hover:bg-[var(--bg-hover)] hover:text-[var(--text)] md:flex"
               >
                 <Icon name="plus" size={12} />
                 Depuis la liste
               </button>
             )}
-            <div className="hidden items-center gap-3 text-[11px] text-[var(--text-subtle)] lg:flex">
-              <kbd className="rounded border border-[var(--border)] bg-[var(--bg-elev)] px-1.5 py-0.5 font-mono">N</kbd>
+            <div className="ml-2 hidden items-center gap-2 text-[10.5px] text-[var(--text-subtle)] lg:flex">
+              <kbd className="rounded border border-[var(--border)] px-1.5 py-0.5 font-mono">N</kbd>
               <span>nouvelle</span>
               <span className="opacity-40">·</span>
-              <kbd className="rounded border border-[var(--border)] bg-[var(--bg-elev)] px-1.5 py-0.5 font-mono">⌘K</kbd>
+              <kbd className="rounded border border-[var(--border)] px-1.5 py-0.5 font-mono">⌘K</kbd>
               <span>rechercher</span>
             </div>
           </div>
@@ -183,7 +183,7 @@ export default function Home() {
               {view.kind === "today" && (
                 <button
                   onClick={() => setPlanOpen(true)}
-                  className="no-select flex items-center gap-1.5 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 px-3 py-1.5 text-[12px] font-medium text-white active:scale-95"
+                  className="no-select flex items-center gap-1.5 rounded-full bg-[var(--text)] px-3 py-1.5 text-[12px] font-medium text-[var(--bg)] active:scale-95"
                 >
                   <Icon name="sparkles" size={12} />
                   Planifier
@@ -235,17 +235,17 @@ export default function Home() {
         </div>
       </main>
 
-      {/* Mobile FAB */}
+      {/* Mobile FAB — minimalist, mono-tone */}
       <button
         onClick={() => setMobileAddOpen(true)}
-        className="fixed right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-[var(--accent)] text-white transition active:scale-90 md:hidden no-select"
+        className="fixed right-4 z-30 flex h-12 w-12 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--bg)] transition active:scale-90 md:hidden no-select"
         style={{
-          bottom: "calc(env(safe-area-inset-bottom) + 76px)",
-          boxShadow: "var(--shadow-accent)",
+          bottom: "calc(env(safe-area-inset-bottom) + 72px)",
+          boxShadow: "var(--shadow-md)",
         }}
         aria-label="Ajouter une tâche"
       >
-        <Icon name="plus" size={26} />
+        <Icon name="plus" size={22} />
       </button>
 
       {/* Bottom nav (mobile only) */}
