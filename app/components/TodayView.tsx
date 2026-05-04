@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useStore } from "../store";
 import { useToast } from "../toast";
 import { useGoogle } from "../google";
@@ -9,9 +9,13 @@ import { todayISO } from "../lib/dates";
 import { GoogleEvent, eventStart, isAllDay } from "../lib/google-client";
 import TaskRow from "./TaskRow";
 import EventRow from "./EventRow";
+import TimelineView from "./TimelineView";
 import Icon from "./Icon";
 
 type Props = { onOpenTask: (id: string) => void };
+
+type ViewMode = "list" | "timeline";
+const VIEW_MODE_KEY = "vague:today:view:v1";
 
 type SectionItem =
   | { kind: "task"; task: Task; sortKey: number }
@@ -66,14 +70,27 @@ function eventTimeSlot(e: GoogleEvent): "allday" | "morning" | "afternoon" | "ev
 
 export default function TodayView({ onOpenTask }: Props) {
   const { tasks, restoreTasks, deleteTasks } = useStore();
-  const { eventsForDate } = useGoogle();
+  const { eventsForDate, isConnected: googleConnected } = useGoogle();
   const toast = useToast();
   const [showCompleted, setShowCompleted] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
   const today = todayISO();
   const now = new Date();
   const nowMins = now.getHours() * 60 + now.getMinutes();
   const todayEvents = eventsForDate(today);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(VIEW_MODE_KEY) as ViewMode | null;
+      if (saved === "list" || saved === "timeline") setViewMode(saved);
+    } catch {}
+  }, []);
+
+  function changeView(m: ViewMode) {
+    setViewMode(m);
+    try { localStorage.setItem(VIEW_MODE_KEY, m); } catch {}
+  }
 
   const { sections, totals } = useMemo(() => {
     const overdue: Task[] = [];
@@ -248,11 +265,40 @@ export default function TodayView({ onOpenTask }: Props) {
               </div>
             </div>
           )}
+
+          {/* View toggle (only when there's something to show) */}
+          {(totals.total > 0 || totals.eventCount > 0) && (
+            <div className="mt-5 inline-flex rounded-full border border-[var(--border)] bg-[var(--bg)] p-0.5">
+              <button
+                onClick={() => changeView("list")}
+                className={`rounded-full px-3 py-1 text-[11.5px] font-medium transition ${
+                  viewMode === "list"
+                    ? "bg-[var(--bg-elev)] text-[var(--text-strong)] shadow-sm"
+                    : "text-[var(--text-muted)] hover:text-[var(--text)]"
+                }`}
+              >
+                Liste
+              </button>
+              <button
+                onClick={() => changeView("timeline")}
+                className={`rounded-full px-3 py-1 text-[11.5px] font-medium transition ${
+                  viewMode === "timeline"
+                    ? "bg-[var(--bg-elev)] text-[var(--text-strong)] shadow-sm"
+                    : "text-[var(--text-muted)] hover:text-[var(--text)]"
+                }`}
+              >
+                Timeline
+              </button>
+            </div>
+          )}
         </div>
       </section>
 
-      {/* === Sections === */}
-      {sections.map((s) => {
+      {/* === Timeline mode === */}
+      {viewMode === "timeline" && <TimelineView onOpenTask={onOpenTask} />}
+
+      {/* === List mode === */}
+      {viewMode === "list" && sections.map((s) => {
         const isCurrent =
           (s.id === "morning" && nowMins < 12 * 60) ||
           (s.id === "afternoon" && nowMins >= 12 * 60 && nowMins < 17 * 60) ||

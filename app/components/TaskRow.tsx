@@ -1,10 +1,12 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Task } from "../lib/types";
 import { formatDueLabel, todayISO, addDays } from "../lib/dates";
 import { formatRecurrence } from "../lib/recurrence";
 import { useStore } from "../store";
+import { useGoogle } from "../google";
+import { findEventConflicts } from "../lib/calendar-utils";
 import { haptic } from "../lib/haptics";
 import Icon from "./Icon";
 
@@ -31,6 +33,7 @@ const PRIORITY_COLOR: Record<string, string> = {
 
 export default function TaskRow({ task, selected, onToggleSelect, onOpen, trashMode, onRestore, onHardDelete }: Props) {
   const { projects, toggleDone, patchTask, deleteTask } = useStore();
+  const { eventsForDate, isConnected } = useGoogle();
   const project = projects.find((p) => p.id === task.projectId);
   const due = formatDueLabel(task.dueDate);
   const subDone = task.subtasks.filter((s) => s.done).length;
@@ -38,6 +41,14 @@ export default function TaskRow({ task, selected, onToggleSelect, onOpen, trashM
   const today = todayISO();
   const isToday = task.dueDate === today;
   const isOverdue = task.dueDate && task.dueDate < today && !task.done;
+
+  // Conflict detection: only for tasks with a dueTime + future + Google connected
+  const conflicts = useMemo(() => {
+    if (!isConnected || task.done || task.waiting) return [];
+    if (!task.dueDate || !task.dueTime) return [];
+    return findEventConflicts(task, eventsForDate(task.dueDate));
+  }, [task, eventsForDate, isConnected]);
+  const hasConflict = conflicts.length > 0;
 
   const [swipeX, setSwipeX] = useState(0);
   const [swiping, setSwiping] = useState(false);
@@ -197,6 +208,15 @@ export default function TaskRow({ task, selected, onToggleSelect, onOpen, trashM
                 <span className={`flex items-center gap-1 ${isOverdue ? "font-medium text-rose-600 dark:text-rose-400" : isToday ? "font-medium text-[var(--accent)]" : due.tone}`}>
                   <Icon name="clock" size={10} />
                   {due.label}{task.dueTime ? ` · ${task.dueTime}` : ""}
+                </span>
+              )}
+              {hasConflict && (
+                <span
+                  className="flex items-center gap-1 font-medium text-rose-600 dark:text-rose-400"
+                  title={`Conflit avec ${conflicts.map((e) => e.summary || "Événement").join(", ")}`}
+                >
+                  ⚠ Conflit avec {conflicts[0].summary || "événement"}
+                  {conflicts.length > 1 && ` +${conflicts.length - 1}`}
                 </span>
               )}
               {project && project.id !== "inbox" && (

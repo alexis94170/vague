@@ -2,8 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useStore } from "../store";
+import { useGoogle } from "../google";
+import { useToast } from "../toast";
 import { aiPlan, PlanResult } from "../lib/ai-client";
 import { todayISO } from "../lib/dates";
+import { autoSchedule, clampToNow, findFreeSlots, formatHourMinute, formatDuration, workDayWindow } from "../lib/calendar-utils";
 import { haptic } from "../lib/haptics";
 import { Task } from "../lib/types";
 import Icon from "./Icon";
@@ -14,13 +17,26 @@ type Props = {
 };
 
 export default function DailyPlan({ open, onClose }: Props) {
-  const { tasks, projects, patchTasks } = useStore();
+  const { tasks, projects, patchTasks, patchTask } = useStore();
+  const { eventsForDate, isConnected } = useGoogle();
+  const toast = useToast();
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<PlanResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [availableMinutes, setAvailableMinutes] = useState<number | undefined>();
   const [focus, setFocus] = useState("");
   const [checked, setChecked] = useState<Set<string>>(new Set());
+  const today = todayISO();
+  const todayEvents = isConnected ? eventsForDate(today) : [];
+
+  // Free slots for today
+  const freeSlots = useMemo(() => {
+    if (!isConnected) return [];
+    const baseWindow = workDayWindow(today);
+    const win = clampToNow(baseWindow, today);
+    return findFreeSlots(todayEvents, win.start, win.end, 15);
+  }, [todayEvents, today, isConnected]);
+  const totalFreeMinutes = freeSlots.reduce((sum, s) => sum + s.minutes, 0);
 
   const selectedTasks = useMemo<Task[]>(() => {
     if (!result) return [];
@@ -71,6 +87,31 @@ export default function DailyPlan({ open, onClose }: Props) {
     if (ids.length === 0) return;
     patchTasks(ids, { dueDate: todayISO() });
     haptic("success");
+    onClose();
+  }
+
+  function autoApply() {
+    const ids = Array.from(checked);
+    if (ids.length === 0) return;
+    const tasksToSchedule = ids
+      .map((id) => tasks.find((t) => t.id === id))
+      .filter((t): t is Task => !!t);
+
+    const { scheduled, unscheduled } = autoSchedule(tasksToSchedule, freeSlots, 5);
+
+    // First, set dueDate=today for all
+    patchTasks(ids, { dueDate: today });
+    // Then set per-task dueTime based on schedule
+    for (const s of scheduled) {
+      const time = `${String(s.start.getHours()).padStart(2, "0")}:${String(s.start.getMinutes()).padStart(2, "0")}`;
+      patchTask(s.taskId, { dueTime: time });
+    }
+    haptic("success");
+    if (unscheduled.length > 0) {
+      toast.show({ message: `${scheduled.length} planifiées · ${unscheduled.length} sans créneau` });
+    } else {
+      toast.show({ message: `${scheduled.length} tâche(s) planifiée(s) 🌊` });
+    }
     onClose();
   }
 
@@ -151,6 +192,35 @@ export default function DailyPlan({ open, onClose }: Props) {
                 <p className="text-[13px] leading-relaxed text-[var(--text)]">{result.reasoning}</p>
               </div>
 
+              {/* Free slots from Google Agenda */}
+              {isConnected && freeSlots.length > 0 && (
+                <div className="rounded-lg border border-[var(--border)] bg-[var(--bg)] px-4 py-3">
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+                      Créneaux libres aujourd&apos;hui
+                    </span>
+                    <span className="text-[11px] text-[var(--text-muted)]">{formatDuration(totalFreeMinutes)}</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {freeSlots.map((slot, i) => (
+                      <span
+                        key={i}
+                        className="flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--bg-elev)] px-2.5 py-1 text-[11.5px] text-[var(--text-muted)]"
+                      >
+                        <span className="font-medium text-[var(--text)]">{formatHourMinute(slot.start)}</span>
+                        <span className="text-[var(--text-subtle)]">·</span>
+                        {formatDuration(slot.minutes)}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {isConnected && freeSlots.length === 0 && (
+                <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-[12.5px] text-amber-800 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-300">
+                  Ton agenda est plein aujourd&apos;hui. Pas de créneau libre détecté.
+                </div>
+              )}
+
               {result.warnings.length > 0 && (
                 <div className="space-y-1">
                   {result.warnings.map((w, i) => (
@@ -222,16 +292,27 @@ export default function DailyPlan({ open, onClose }: Props) {
         </div>
 
         {result && (
-          <div className="flex items-center justify-between border-t border-[var(--border)] bg-[var(--bg)] px-5 py-3 safe-bottom">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--border)] bg-[var(--bg)] px-5 py-3 safe-bottom">
             <span className="text-[11.5px] text-[var(--text-muted)]">
-              {checked.size} tâche{checked.size > 1 ? "s" : ""} passera à aujourd&apos;hui
+              {checked.size} sélectionnée{checked.size > 1 ? "s" : ""}
             </span>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <button onClick={onClose} className="rounded-md px-3 py-1.5 text-[12.5px] text-[var(--text-muted)] hover:bg-[var(--bg-hover)]">Annuler</button>
+              {isConnected && freeSlots.length > 0 && (
+                <button
+                  onClick={autoApply}
+                  disabled={checked.size === 0}
+                  className="flex items-center gap-1.5 rounded-md border border-[var(--accent)]/40 bg-[var(--bg-elev)] px-3 py-1.5 text-[12.5px] font-medium text-[var(--accent)] transition hover:bg-[var(--accent-soft)] disabled:opacity-40"
+                  title="Place les tâches dans tes créneaux libres"
+                >
+                  <Icon name="sparkles" size={12} />
+                  Auto-planifier
+                </button>
+              )}
               <button
                 onClick={apply}
                 disabled={checked.size === 0}
-                className="rounded-md bg-[var(--accent)] px-4 py-1.5 text-[12.5px] font-medium text-white transition hover:bg-[var(--accent-hover)] disabled:opacity-40"
+                className="rounded-md bg-[var(--accent)] px-4 py-1.5 text-[12.5px] font-medium text-[var(--accent-fg)] transition hover:bg-[var(--accent-hover)] disabled:opacity-40"
               >
                 Appliquer
               </button>

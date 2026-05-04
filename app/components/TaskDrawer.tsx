@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useStore } from "../store";
 import { useGoogle } from "../google";
 import { useToast } from "../toast";
 import { Priority, PRIORITY_LABEL, RecurrenceUnit, Subtask, Task } from "../lib/types";
 import { newId } from "../lib/storage";
 import { createCalendarEvent } from "../lib/google-client";
+import { findEventConflicts, findFreeSlots, formatHourMinute, formatDuration, workDayWindow, clampToNow } from "../lib/calendar-utils";
 import { usePomodoro } from "../pomodoro";
 import Icon from "./Icon";
 import MarkdownPreview from "./MarkdownPreview";
@@ -256,6 +257,9 @@ export default function TaskDrawer({ taskId, onClose, onFocus }: Props) {
             </div>
           )}
 
+          {/* Conflict + free slot panel */}
+          <ConflictPanel draft={draft} onPickTime={(time) => save({ dueTime: time })} />
+
           <div className="mt-6 grid grid-cols-2 gap-3">
             <Field label="Priorité" icon="flag">
               <select
@@ -420,6 +424,78 @@ export default function TaskDrawer({ taskId, onClose, onFocus }: Props) {
 
 const fieldInput =
   "w-full rounded-md border border-[var(--border)] bg-[var(--bg)] px-2.5 py-1.5 text-[13px] outline-none transition hover:border-[var(--border-strong)] focus:border-[var(--accent)]/50";
+
+function ConflictPanel({ draft, onPickTime }: { draft: Task; onPickTime: (time: string) => void }) {
+  const { eventsForDate, isConnected } = useGoogle();
+  if (!isConnected || !draft.dueDate) return null;
+
+  const dayEvents = eventsForDate(draft.dueDate);
+  const conflicts = useMemo(
+    () => (draft.dueTime ? findEventConflicts(draft, dayEvents) : []),
+    [draft, dayEvents]
+  );
+
+  // Compute free slots for that day (work window 8h-19h, clamped to now if today)
+  const freeSlots = useMemo(() => {
+    const baseWindow = workDayWindow(draft.dueDate!);
+    const win = clampToNow(baseWindow, draft.dueDate!);
+    if (win.start >= win.end) return [];
+    const dur = draft.estimateMinutes ?? 30;
+    return findFreeSlots(dayEvents, win.start, win.end, Math.max(15, dur));
+  }, [draft.dueDate, dayEvents, draft.estimateMinutes]);
+
+  const showSuggestions = freeSlots.length > 0 && !draft.done;
+  if (conflicts.length === 0 && !showSuggestions) return null;
+
+  return (
+    <div className="ml-8 mt-4 space-y-2">
+      {conflicts.length > 0 && (
+        <div className="rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 dark:border-rose-900/50 dark:bg-rose-900/20">
+          <div className="flex items-center gap-1.5 text-[11.5px] font-semibold text-rose-700 dark:text-rose-300">
+            ⚠ Conflit avec {conflicts.length} événement{conflicts.length > 1 ? "s" : ""}
+          </div>
+          <div className="mt-1 space-y-0.5">
+            {conflicts.slice(0, 3).map((e) => (
+              <div key={e.id} className="text-[11.5px] text-rose-700 dark:text-rose-300">
+                · {e.summary || "Sans titre"} ({formatHourMinute(new Date(e.start.dateTime ?? e.start.date ?? 0))})
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {showSuggestions && (
+        <div className="rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 py-2">
+          <div className="mb-1.5 flex items-center justify-between">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+              Créneaux libres
+            </span>
+            {draft.estimateMinutes && (
+              <span className="text-[10.5px] text-[var(--text-subtle)]">
+                pour {formatDuration(draft.estimateMinutes)}
+              </span>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {freeSlots.slice(0, 6).map((slot, i) => {
+              const time = `${String(slot.start.getHours()).padStart(2, "0")}:${String(slot.start.getMinutes()).padStart(2, "0")}`;
+              return (
+                <button
+                  key={i}
+                  onClick={() => onPickTime(time)}
+                  className="rounded-full border border-[var(--border)] bg-[var(--bg-elev)] px-2.5 py-1 text-[11.5px] font-medium text-[var(--text-muted)] transition hover:border-[var(--accent)]/40 hover:text-[var(--accent)]"
+                  title={`${formatHourMinute(slot.start)} → ${formatHourMinute(slot.end)} (${formatDuration(slot.minutes)} libre)`}
+                >
+                  {formatHourMinute(slot.start)}
+                  <span className="ml-1.5 text-[10px] text-[var(--text-subtle)]">{formatDuration(slot.minutes)}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function SubtaskList({
   subtasks,
