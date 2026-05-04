@@ -7,6 +7,9 @@ import { addDays, todayISO, diffDays, parseISODate } from "../lib/dates";
 import { Task } from "../lib/types";
 import Icon from "./Icon";
 import SuggestionsPanel from "./SuggestionsPanel";
+import DailyTracker from "./DailyTracker";
+import ShoppingWidget from "./ShoppingWidget";
+import SportsWidget from "./SportsWidget";
 
 type Props = {
   onOpenPlan: () => void;
@@ -137,8 +140,17 @@ export default function Dashboard({ onOpenPlan, onOpenChat, onNavigate }: Props)
         </div>
       </div>
 
+      {/* Suivi du jour */}
+      <DailyTracker />
+
       {/* AI Suggestions */}
       <SuggestionsPanel />
+
+      {/* Quick widgets — Apple style */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <ShoppingWidget />
+        <SportsWidget />
+      </div>
 
       {/* Key stats grid */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
