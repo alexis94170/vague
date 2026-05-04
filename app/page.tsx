@@ -41,7 +41,7 @@ function greeting(): string {
 
 export default function Home() {
   const { projects, tasks, loading } = useStore();
-  const [view, setView] = useState<ViewKind>({ kind: "today" });
+  const [view, setView] = useState<ViewKind>({ kind: "dashboard" });
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const [focusTaskId, setFocusTaskId] = useState<string | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
