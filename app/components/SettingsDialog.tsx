@@ -5,6 +5,7 @@ import { PALETTE_INFO, ThemeMode, ThemePalette, useTheme } from "../theme";
 import { notificationPermission, requestNotificationPermission } from "./Notifications";
 import { isPushSupported, isSubscribed, sendTestPush, subscribeToPush, unsubscribeFromPush } from "../lib/push-client";
 import { clearAiCost, getAiCostSummary } from "../lib/ai-cost-tracker";
+import { useGoogle } from "../google";
 import Icon from "./Icon";
 
 type Props = {
@@ -14,19 +15,32 @@ type Props = {
 
 export default function SettingsDialog({ open, onClose }: Props) {
   const { mode, palette, setMode, setPalette } = useTheme();
+  const google = useGoogle();
   const [notifPerm, setNotifPerm] = useState<string>("default");
   const [pushOn, setPushOn] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
   const [pushMsg, setPushMsg] = useState<string | null>(null);
   const [aiCost, setAiCost] = useState(() => getAiCostSummary());
+  const [googleBusy, setGoogleBusy] = useState(false);
 
   useEffect(() => {
     if (open) {
       setNotifPerm(notificationPermission());
       isSubscribed().then(setPushOn);
       setAiCost(getAiCostSummary());
+      google.refreshStatus();
     }
   }, [open]);
+
+  async function disconnectGoogle() {
+    if (!confirm("Déconnecter Google Calendar ?")) return;
+    setGoogleBusy(true);
+    try {
+      await google.disconnect();
+    } finally {
+      setGoogleBusy(false);
+    }
+  }
 
   async function handleNotifToggle() {
     const result = await requestNotificationPermission();
@@ -213,6 +227,59 @@ export default function SettingsDialog({ open, onClose }: Props) {
               )}
               {pushMsg && (
                 <div className="mt-2 text-[11px] text-[var(--accent)]">{pushMsg}</div>
+              )}
+            </div>
+          </section>
+
+          {/* Google Calendar */}
+          <section>
+            <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">Agenda Google</h3>
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--bg)] p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0 flex items-center gap-3">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-soft)]">
+                    <svg viewBox="0 0 24 24" className="h-5 w-5 text-[var(--accent)]" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="4" width="18" height="18" rx="2" />
+                      <path d="M16 2v4M8 2v4M3 10h18" />
+                    </svg>
+                  </span>
+                  <div className="min-w-0">
+                    <div className="text-[13px] font-medium">Google Calendar</div>
+                    <div className="mt-0.5 truncate text-[11.5px] text-[var(--text-muted)]">
+                      {google.status?.connected
+                        ? `Connecté · ${google.status.email ?? "compte Google"}`
+                        : "Voir tes événements et créer des plages depuis tes tâches"}
+                    </div>
+                  </div>
+                </div>
+                {google.status?.connected ? (
+                  <button
+                    onClick={disconnectGoogle}
+                    disabled={googleBusy}
+                    className="shrink-0 rounded-md border border-[var(--border)] bg-[var(--bg-elev)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-muted)] transition hover:border-rose-300 hover:text-rose-600 disabled:opacity-50"
+                  >
+                    Déconnecter
+                  </button>
+                ) : (
+                  <a
+                    href="/api/google/auth"
+                    className="shrink-0 rounded-md bg-[var(--accent)] px-3 py-1.5 text-[12px] font-medium text-[var(--accent-fg)] transition active:scale-95"
+                  >
+                    Connecter
+                  </a>
+                )}
+              </div>
+              {google.status?.connected && google.error && (
+                <div className="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-[11.5px] text-rose-700 dark:border-rose-900/50 dark:bg-rose-900/20 dark:text-rose-300">
+                  {google.error}
+                </div>
+              )}
+              {google.status?.connected && (
+                <div className="mt-3 border-t border-[var(--border)] pt-3 text-[11px] text-[var(--text-subtle)]">
+                  {google.events.length > 0
+                    ? `${google.events.length} événement${google.events.length > 1 ? "s" : ""} sur les 60 prochains jours`
+                    : "Aucun événement chargé pour le moment"}
+                </div>
               )}
             </div>
           </section>

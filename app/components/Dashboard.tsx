@@ -3,7 +3,9 @@
 import { useMemo } from "react";
 import { useStore } from "../store";
 import { useAuth } from "../auth";
+import { useGoogle } from "../google";
 import { addDays, todayISO, parseISODate } from "../lib/dates";
+import { GoogleEvent, eventStart, formatEventTime, isAllDay } from "../lib/google-client";
 import Icon from "./Icon";
 import SuggestionsPanel from "./SuggestionsPanel";
 import ShoppingWidget from "./ShoppingWidget";
@@ -18,8 +20,16 @@ type Props = {
 export default function Dashboard({ onOpenPlan, onOpenChat, onNavigate }: Props) {
   const { tasks } = useStore();
   const { user } = useAuth();
+  const google = useGoogle();
   const today = todayISO();
   const yesterday = addDays(today, -1);
+  const todayEvents = google.eventsForDate(today);
+  const nextEvent = useMemo(() => {
+    const now = new Date();
+    return todayEvents
+      .filter((e) => !isAllDay(e) && eventStart(e) > now)
+      .sort((a, b) => eventStart(a).getTime() - eventStart(b).getTime())[0];
+  }, [todayEvents]);
 
   const stats = useMemo(() => {
     let active = 0;
@@ -260,6 +270,49 @@ export default function Dashboard({ onOpenPlan, onOpenChat, onNavigate }: Props)
         />
       </div>
 
+      {/* Today's events (if Google connected) */}
+      {google.status?.connected && todayEvents.length > 0 && (
+        <section className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-elev)]">
+          <header className="flex items-center justify-between px-5 pt-4 pb-2">
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent)]">
+                <Icon name="calendar" size={13} />
+              </span>
+              <div>
+                <h4 className="text-[13.5px] font-semibold tracking-tight text-[var(--text-strong)]">
+                  Agenda du jour
+                </h4>
+                <div className="text-[11px] text-[var(--text-muted)]">
+                  {todayEvents.length} événement{todayEvents.length > 1 ? "s" : ""}
+                  {nextEvent && (
+                    <>
+                      {" · prochain à "}
+                      <span className="text-[var(--accent)] font-medium">
+                        {eventStart(nextEvent).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          </header>
+          <div className="divide-y divide-[var(--border)]/60">
+            {todayEvents.slice(0, 4).map((e) => (
+              <DashboardEventRow key={e.id} event={e} />
+            ))}
+            {todayEvents.length > 4 && (
+              <button
+                onClick={() => onNavigate("today")}
+                className="flex w-full items-center justify-center gap-1 px-4 py-2.5 text-[12px] text-[var(--text-muted)] hover:bg-[var(--bg-hover)]/40"
+              >
+                Voir les {todayEvents.length - 4} autres
+                <Icon name="chevron-right" size={11} />
+              </button>
+            )}
+          </div>
+        </section>
+      )}
+
       {/* Widgets */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <ShoppingWidget />
@@ -357,6 +410,47 @@ function StatCard({
         {label}
       </div>
     </button>
+  );
+}
+
+function DashboardEventRow({ event }: { event: GoogleEvent }) {
+  const allDay = isAllDay(event);
+  const start = !allDay ? eventStart(event) : null;
+  return (
+    <a
+      href={event.htmlLink}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex items-center gap-3 px-5 py-2.5 transition-colors hover:bg-[var(--bg-hover)]/40"
+    >
+      <span className="flex w-12 shrink-0 flex-col items-end text-right">
+        {allDay ? (
+          <span className="text-[10px] font-medium uppercase tracking-wider text-[var(--text-subtle)]">
+            Toute<br />la journée
+          </span>
+        ) : (
+          <>
+            <span className="text-[13px] font-semibold leading-none text-[var(--text-strong)] num">
+              {start!.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+            </span>
+            <span className="mt-0.5 text-[10px] text-[var(--text-subtle)]">
+              {formatEventTime(event).split(" – ")[1]}
+            </span>
+          </>
+        )}
+      </span>
+      <span className="block h-9 w-[2px] shrink-0 rounded-full bg-[var(--accent)]/50" />
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-[13.5px] font-medium text-[var(--text-strong)]">
+          {event.summary || "(Sans titre)"}
+        </div>
+        {event.location && (
+          <div className="mt-0.5 truncate text-[11px] text-[var(--text-muted)]">
+            📍 {event.location}
+          </div>
+        )}
+      </div>
+    </a>
   );
 }
 

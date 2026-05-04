@@ -3,27 +3,49 @@
 import { useMemo, useState } from "react";
 import { useStore } from "../store";
 import { useToast } from "../toast";
+import { useGoogle } from "../google";
 import { PRIORITY_ORDER, Task } from "../lib/types";
 import { todayISO } from "../lib/dates";
+import { GoogleEvent, eventStart, isAllDay } from "../lib/google-client";
 import TaskRow from "./TaskRow";
+import EventRow from "./EventRow";
 import Icon from "./Icon";
 
 type Props = { onOpenTask: (id: string) => void };
+
+type SectionItem =
+  | { kind: "task"; task: Task; sortKey: number }
+  | { kind: "event"; event: GoogleEvent; sortKey: number };
 
 type Section = {
   id: string;
   label: string;
   range?: string;
   tone?: string;
-  tasks: Task[];
+  items: SectionItem[];
 };
 
-function sortTasks(arr: Task[]): Task[] {
+function taskSortKey(t: Task): number {
+  if (!t.dueTime) return 99 * 60;
+  const [h, m] = t.dueTime.split(":").map(Number);
+  return h * 60 + (m || 0);
+}
+
+function eventSortKey(e: GoogleEvent): number {
+  if (isAllDay(e)) return -1; // all-day first
+  const d = eventStart(e);
+  return d.getHours() * 60 + d.getMinutes();
+}
+
+function sortItems(arr: SectionItem[]): SectionItem[] {
   return [...arr].sort((a, b) => {
-    const ta = a.dueTime ?? "99:99";
-    const tb = b.dueTime ?? "99:99";
-    if (ta !== tb) return ta.localeCompare(tb);
-    return PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority];
+    if (a.sortKey !== b.sortKey) return a.sortKey - b.sortKey;
+    // Tasks come before events at the same time
+    if (a.kind !== b.kind) return a.kind === "task" ? -1 : 1;
+    if (a.kind === "task" && b.kind === "task") {
+      return PRIORITY_ORDER[a.task.priority] - PRIORITY_ORDER[b.task.priority];
+    }
+    return 0;
   });
 }
 
@@ -34,21 +56,32 @@ function timeSlot(time: string): "morning" | "afternoon" | "evening" {
   return "evening";
 }
 
+function eventTimeSlot(e: GoogleEvent): "allday" | "morning" | "afternoon" | "evening" {
+  if (isAllDay(e)) return "allday";
+  const h = eventStart(e).getHours();
+  if (h < 12) return "morning";
+  if (h < 17) return "afternoon";
+  return "evening";
+}
+
 export default function TodayView({ onOpenTask }: Props) {
   const { tasks, restoreTasks, deleteTasks } = useStore();
+  const { eventsForDate, status: googleStatus } = useGoogle();
   const toast = useToast();
   const [showCompleted, setShowCompleted] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const today = todayISO();
   const now = new Date();
   const nowMins = now.getHours() * 60 + now.getMinutes();
+  const todayEvents = eventsForDate(today);
 
   const { sections, totals } = useMemo(() => {
     const overdue: Task[] = [];
-    const morning: Task[] = [];
-    const afternoon: Task[] = [];
-    const evening: Task[] = [];
-    const noTime: Task[] = [];
+    const allday: SectionItem[] = [];
+    const morning: SectionItem[] = [];
+    const afternoon: SectionItem[] = [];
+    const evening: SectionItem[] = [];
+    const noTime: SectionItem[] = [];
     const doneToday: Task[] = [];
 
     for (const t of tasks) {
@@ -63,36 +96,54 @@ export default function TodayView({ onOpenTask }: Props) {
         continue;
       }
       if (t.dueDate === today) {
+        const item: SectionItem = { kind: "task", task: t, sortKey: taskSortKey(t) };
         if (!t.dueTime) {
-          noTime.push(t);
+          noTime.push(item);
         } else {
           const slot = timeSlot(t.dueTime);
-          if (slot === "morning") morning.push(t);
-          else if (slot === "afternoon") afternoon.push(t);
-          else evening.push(t);
+          if (slot === "morning") morning.push(item);
+          else if (slot === "afternoon") afternoon.push(item);
+          else evening.push(item);
         }
       }
     }
 
+    // Inject events
+    for (const e of todayEvents) {
+      const item: SectionItem = { kind: "event", event: e, sortKey: eventSortKey(e) };
+      const slot = eventTimeSlot(e);
+      if (slot === "allday") allday.push(item);
+      else if (slot === "morning") morning.push(item);
+      else if (slot === "afternoon") afternoon.push(item);
+      else evening.push(item);
+    }
+
+    const overdueItems: SectionItem[] = overdue.map((t) => ({ kind: "task", task: t, sortKey: taskSortKey(t) }));
+
     const sections: Section[] = [
-      ...(overdue.length ? [{ id: "overdue", label: "En retard", tone: "text-rose-600 dark:text-rose-400", tasks: sortTasks(overdue) }] : []),
-      { id: "morning", label: "Matin", range: "5h – 12h", tasks: sortTasks(morning) },
-      { id: "afternoon", label: "Après-midi", range: "12h – 17h", tasks: sortTasks(afternoon) },
-      { id: "evening", label: "Soir", range: "17h – 23h", tasks: sortTasks(evening) },
-      { id: "noTime", label: "Sans heure", tasks: sortTasks(noTime) },
-    ].filter((s) => s.tasks.length > 0);
+      ...(overdueItems.length ? [{ id: "overdue", label: "En retard", tone: "text-rose-600 dark:text-rose-400", items: sortItems(overdueItems) }] : []),
+      ...(allday.length ? [{ id: "allday", label: "Toute la journée", items: sortItems(allday) }] : []),
+      { id: "morning", label: "Matin", range: "5h – 12h", items: sortItems(morning) },
+      { id: "afternoon", label: "Après-midi", range: "12h – 17h", items: sortItems(afternoon) },
+      { id: "evening", label: "Soir", range: "17h – 23h", items: sortItems(evening) },
+      { id: "noTime", label: "Sans heure", items: sortItems(noTime) },
+    ].filter((s) => s.items.length > 0);
+
+    const taskCount = overdue.length + morning.filter((i) => i.kind === "task").length + afternoon.filter((i) => i.kind === "task").length + evening.filter((i) => i.kind === "task").length + noTime.filter((i) => i.kind === "task").length;
+    const allTasksToday = [...overdue, ...morning, ...afternoon, ...evening, ...noTime].filter((i): i is { kind: "task"; task: Task; sortKey: number } => "kind" in i && i.kind === "task" || !("kind" in i)).map((i) => "task" in i ? i.task : (i as Task));
 
     const totals = {
-      total: overdue.length + morning.length + afternoon.length + evening.length + noTime.length,
+      total: taskCount,
       done: doneToday.length,
-      urgent: [...overdue, ...morning, ...afternoon, ...evening, ...noTime].filter((t) => t.priority === "urgent").length,
+      urgent: allTasksToday.filter((t) => t.priority === "urgent").length,
       overdue: overdue.length,
-      estimateMin: [...overdue, ...morning, ...afternoon, ...evening, ...noTime].reduce((sum, t) => sum + (t.estimateMinutes ?? 0), 0),
+      estimateMin: allTasksToday.reduce((sum, t) => sum + (t.estimateMinutes ?? 0), 0),
       doneToday,
+      eventCount: todayEvents.length,
     };
 
     return { sections, totals };
-  }, [tasks, today]);
+  }, [tasks, today, todayEvents]);
 
   const total = totals.total + totals.done;
   const pct = total > 0 ? Math.round((totals.done / total) * 100) : 0;
@@ -110,8 +161,8 @@ export default function TodayView({ onOpenTask }: Props) {
     });
   }
 
-  // Empty state
-  if (totals.total === 0 && totals.done === 0) {
+  // Empty state — only when no tasks AND no events
+  if (totals.total === 0 && totals.done === 0 && totals.eventCount === 0) {
     return (
       <div className="rounded-3xl border border-[var(--border)] bg-[var(--bg-elev)] py-20 text-center">
         <div className="mx-auto flex h-20 w-20 items-center justify-center">
@@ -157,7 +208,7 @@ export default function TodayView({ onOpenTask }: Props) {
                   {totals.total === 0 ? "Tout est fait" : totals.total > 1 ? "tâches" : "tâche"}
                 </span>
               </div>
-              {(totals.urgent > 0 || estimateLabel) && (
+              {(totals.urgent > 0 || estimateLabel || totals.eventCount > 0) && (
                 <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-[var(--text-muted)]">
                   {totals.urgent > 0 && (
                     <span className="text-rose-600 dark:text-rose-400 font-medium">
@@ -165,6 +216,12 @@ export default function TodayView({ onOpenTask }: Props) {
                     </span>
                   )}
                   {estimateLabel && <span>{estimateLabel}</span>}
+                  {totals.eventCount > 0 && (
+                    <span className="flex items-center gap-1 text-[var(--accent)]">
+                      <Icon name="calendar" size={11} />
+                      {totals.eventCount} événement{totals.eventCount > 1 ? "s" : ""}
+                    </span>
+                  )}
                 </div>
               )}
             </div>
@@ -218,19 +275,23 @@ export default function TodayView({ onOpenTask }: Props) {
                 )}
               </div>
               <span className="text-[11px] tabular-nums text-[var(--text-subtle)]">
-                {s.tasks.length}
+                {s.items.length}
               </span>
             </header>
             <div className="divide-y divide-[var(--border)]/60">
-              {s.tasks.map((t) => (
-                <TaskRow
-                  key={t.id}
-                  task={t}
-                  selected={selected.has(t.id)}
-                  onToggleSelect={toggleSelect}
-                  onOpen={onOpenTask}
-                />
-              ))}
+              {s.items.map((it) =>
+                it.kind === "task" ? (
+                  <TaskRow
+                    key={`t-${it.task.id}`}
+                    task={it.task}
+                    selected={selected.has(it.task.id)}
+                    onToggleSelect={toggleSelect}
+                    onOpen={onOpenTask}
+                  />
+                ) : (
+                  <EventRow key={`e-${it.event.id}`} event={it.event} />
+                )
+              )}
             </div>
           </section>
         );

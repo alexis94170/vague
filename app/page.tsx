@@ -30,6 +30,8 @@ import KeyboardShortcuts from "./components/KeyboardShortcuts";
 import TemplatesDialog from "./components/TemplatesDialog";
 import Icon from "./components/Icon";
 import { todayISO } from "./lib/dates";
+import { useToast } from "./toast";
+import { useGoogle } from "./google";
 
 function greeting(): string {
   const h = new Date().getHours();
@@ -41,6 +43,8 @@ function greeting(): string {
 
 export default function Home() {
   const { projects, tasks, loading } = useStore();
+  const toast = useToast();
+  const google = useGoogle();
   const [view, setView] = useState<ViewKind>({ kind: "dashboard" });
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const [focusTaskId, setFocusTaskId] = useState<string | null>(null);
@@ -67,6 +71,27 @@ export default function Home() {
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  // Handle Google OAuth callback redirects
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const g = params.get("google");
+    if (!g) return;
+    if (g === "connected") {
+      toast.show({ message: "Google Calendar connecté 🌊" });
+      google.refreshStatus();
+    } else if (g === "denied") {
+      toast.show({ message: "Connexion annulée." });
+    } else if (g === "error") {
+      const reason = params.get("reason") ?? "inconnue";
+      toast.show({ message: `Erreur de connexion : ${reason}` });
+    }
+    // Clean URL
+    const u = new URL(window.location.href);
+    u.searchParams.delete("google");
+    u.searchParams.delete("reason");
+    window.history.replaceState({}, "", u.toString());
   }, []);
 
   const project = view.kind === "project" ? projects.find((p) => p.id === view.id) : null;

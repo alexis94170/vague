@@ -2,9 +2,12 @@
 
 import { useMemo, useState } from "react";
 import { useStore } from "../store";
+import { useGoogle } from "../google";
 import { addDays, todayISO, toISODate, parseISODate } from "../lib/dates";
 import { PRIORITY_ORDER, Task } from "../lib/types";
+import { GoogleEvent, formatEventTime, isAllDay } from "../lib/google-client";
 import { haptic } from "../lib/haptics";
+import EventRow from "./EventRow";
 import Icon from "./Icon";
 
 type Props = {
@@ -41,6 +44,7 @@ function monthGrid(year: number, month: number): string[][] {
 
 export default function CalendarView({ onOpenTask }: Props) {
   const { tasks, projects, patchTask } = useStore();
+  const { eventsForDate } = useGoogle();
   const today = todayISO();
   const [cursor, setCursor] = useState(() => {
     const d = new Date();
@@ -131,8 +135,11 @@ export default function CalendarView({ onOpenTask }: Props) {
           const isToday = date === today;
           const isSelected = date === selectedDate;
           const dayTasks = tasksByDate.get(date) ?? [];
-          const visibleTasks = dayTasks.slice(0, 3);
-          const hidden = dayTasks.length - visibleTasks.length;
+          const dayEvents = eventsForDate(date);
+          const visibleEvents = dayEvents.slice(0, 2);
+          const remainingTaskSlots = Math.max(0, 3 - visibleEvents.length);
+          const visibleTasks = dayTasks.slice(0, remainingTaskSlots);
+          const hidden = (dayTasks.length - visibleTasks.length) + (dayEvents.length - visibleEvents.length);
 
           return (
             <button
@@ -154,15 +161,37 @@ export default function CalendarView({ onOpenTask }: Props) {
             >
               <div className="flex items-center justify-between">
                 <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-semibold ${
-                  isToday ? "bg-[var(--accent)] text-white" : "text-[var(--text)]"
+                  isToday ? "bg-[var(--accent)] text-[var(--accent-fg)]" : "text-[var(--text)]"
                 }`}>
                   {d.getDate()}
                 </span>
-                {dayTasks.length > 0 && (
-                  <span className="text-[10px] tabular-nums text-[var(--text-subtle)]">{dayTasks.length}</span>
-                )}
+                <div className="flex items-center gap-1">
+                  {dayEvents.length > 0 && (
+                    <span className="flex items-center gap-0.5 text-[9.5px] text-[var(--accent)]">
+                      <Icon name="calendar" size={9} />
+                      {dayEvents.length}
+                    </span>
+                  )}
+                  {dayTasks.length > 0 && (
+                    <span className="text-[10px] tabular-nums text-[var(--text-subtle)]">{dayTasks.length}</span>
+                  )}
+                </div>
               </div>
               <div className="flex flex-col gap-0.5">
+                {visibleEvents.map((e) => (
+                  <div
+                    key={e.id}
+                    onClick={(ev) => {
+                      ev.stopPropagation();
+                      if (e.htmlLink) window.open(e.htmlLink, "_blank", "noopener,noreferrer");
+                    }}
+                    className="flex items-center gap-1 truncate rounded bg-[var(--accent-soft)] px-1.5 py-0.5 text-left text-[10.5px] text-[var(--accent)]"
+                    style={{ borderLeft: "2px solid var(--accent)" }}
+                    title={e.summary}
+                  >
+                    <span className="truncate">{e.summary || "(Sans titre)"}</span>
+                  </div>
+                ))}
                 {visibleTasks.map((t) => {
                   const project = t.projectId ? projectsById.get(t.projectId) : null;
                   return (
@@ -192,11 +221,12 @@ export default function CalendarView({ onOpenTask }: Props) {
         })}
       </div>
 
-      {/* Selected day tasks */}
+      {/* Selected day tasks + events */}
       {selectedDate && (
         <DayPanel
           date={selectedDate}
           tasks={tasksByDate.get(selectedDate) ?? []}
+          events={eventsForDate(selectedDate)}
           projectsById={projectsById}
           onOpenTask={onOpenTask}
           onClose={() => setSelectedDate(null)}
@@ -209,31 +239,43 @@ export default function CalendarView({ onOpenTask }: Props) {
 function DayPanel({
   date,
   tasks,
+  events,
   projectsById,
   onOpenTask,
   onClose,
 }: {
   date: string;
   tasks: Task[];
+  events: GoogleEvent[];
   projectsById: Map<string, { name: string; color: string }>;
   onOpenTask: (id: string) => void;
   onClose: () => void;
 }) {
   const d = parseISODate(date);
   const label = d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
+  const empty = tasks.length === 0 && events.length === 0;
   return (
     <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-elev)]">
       <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-2.5">
         <h4 className="text-[13.5px] font-semibold capitalize">{label}</h4>
         <div className="flex items-center gap-2">
+          {events.length > 0 && (
+            <span className="flex items-center gap-1 text-[11.5px] text-[var(--accent)]">
+              <Icon name="calendar" size={10} />
+              {events.length}
+            </span>
+          )}
           <span className="text-[11.5px] text-[var(--text-muted)]">{tasks.length} tâche{tasks.length !== 1 ? "s" : ""}</span>
           <button onClick={onClose} className="rounded px-1.5 py-0.5 text-[11.5px] text-[var(--text-muted)] hover:bg-[var(--bg-hover)]">✕</button>
         </div>
       </div>
-      {tasks.length === 0 ? (
-        <div className="px-4 py-6 text-center text-[12.5px] text-[var(--text-subtle)]">Aucune tâche ce jour.</div>
+      {empty ? (
+        <div className="px-4 py-6 text-center text-[12.5px] text-[var(--text-subtle)]">Rien ce jour.</div>
       ) : (
         <div className="divide-y divide-[var(--border)]">
+          {events.map((e) => (
+            <EventRow key={e.id} event={e} compact />
+          ))}
           {tasks.map((t) => {
             const project = t.projectId ? projectsById.get(t.projectId) : null;
             return (

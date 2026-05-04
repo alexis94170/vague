@@ -6,6 +6,7 @@ import AuthGate from "./AuthGate";
 import { StoreProvider } from "./store";
 import { ThemeProvider } from "./theme";
 import { PomodoroProvider } from "./pomodoro";
+import { GoogleProvider } from "./google";
 import ServiceWorkerRegister from "./components/ServiceWorkerRegister";
 import { ToastProvider } from "./toast";
 
@@ -70,7 +71,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <AuthProvider>
               <AuthGate>
                 <StoreProvider>
-                  <PomodoroProvider>{children}</PomodoroProvider>
+                  <GoogleProvider>
+                    <PomodoroProvider>{children}</PomodoroProvider>
+                  </GoogleProvider>
                 </StoreProvider>
               </AuthGate>
             </AuthProvider>

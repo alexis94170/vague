@@ -2,8 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useStore } from "../store";
+import { useGoogle } from "../google";
+import { useToast } from "../toast";
 import { Priority, PRIORITY_LABEL, RecurrenceUnit, Subtask, Task } from "../lib/types";
 import { newId } from "../lib/storage";
+import { createCalendarEvent } from "../lib/google-client";
 import { usePomodoro } from "../pomodoro";
 import Icon from "./Icon";
 import MarkdownPreview from "./MarkdownPreview";
@@ -16,10 +19,13 @@ type Props = {
 
 export default function TaskDrawer({ taskId, onClose, onFocus }: Props) {
   const { tasks, projects, patchTask, deleteTask } = useStore();
+  const google = useGoogle();
+  const toast = useToast();
   const { start: startPomodoro } = usePomodoro();
   const task = tasks.find((t) => t.id === taskId) ?? null;
 
   const [draft, setDraft] = useState<Task | null>(task);
+  const [creatingEvent, setCreatingEvent] = useState(false);
 
   useEffect(() => {
     setDraft(task);
@@ -73,6 +79,33 @@ export default function TaskDrawer({ taskId, onClose, onFocus }: Props) {
       .map((t) => t.trim().replace(/^[@#]/, ""))
       .filter(Boolean);
     save({ tags });
+  }
+
+  async function blockInCalendar() {
+    if (!draft) return;
+    setCreatingEvent(true);
+    try {
+      // Determine start/end
+      const dateStr = draft.dueDate || new Date().toISOString().slice(0, 10);
+      const timeStr = draft.dueTime || "09:00";
+      const startDate = new Date(`${dateStr}T${timeStr}:00`);
+      const duration = draft.estimateMinutes || 30;
+      const endDate = new Date(startDate.getTime() + duration * 60_000);
+
+      await createCalendarEvent({
+        summary: draft.title,
+        description: draft.notes,
+        start: startDate.toISOString(),
+        end: endDate.toISOString(),
+      });
+      // refresh agenda
+      await google.refresh();
+      toast.show({ message: "Bloqué dans ton agenda 🌊" });
+    } catch (e) {
+      toast.show({ message: `Échec : ${(e as Error).message}` });
+    } finally {
+      setCreatingEvent(false);
+    }
   }
 
   return (
@@ -148,6 +181,17 @@ export default function TaskDrawer({ taskId, onClose, onFocus }: Props) {
 
           {!draft.done && (
             <div className="mt-4 ml-8 flex flex-wrap gap-2">
+              {google.status?.connected && (
+                <button
+                  onClick={blockInCalendar}
+                  disabled={creatingEvent}
+                  className="flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--bg)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-muted)] transition hover:border-[var(--accent)]/40 hover:text-[var(--accent)] active:scale-95 disabled:opacity-50"
+                  title="Créer un événement dans Google Agenda"
+                >
+                  <Icon name="calendar" size={12} />
+                  {creatingEvent ? "Création…" : "Bloquer dans l'agenda"}
+                </button>
+              )}
               <button
                 onClick={() => {
                   startPomodoro({ taskId: draft.id, taskTitle: draft.title, minutes: draft.estimateMinutes && draft.estimateMinutes <= 60 ? draft.estimateMinutes : 25 });
