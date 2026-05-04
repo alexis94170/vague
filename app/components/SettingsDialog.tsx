@@ -269,16 +269,27 @@ export default function SettingsDialog({ open, onClose }: Props) {
                   </a>
                 )}
               </div>
-              {google.status?.connected && google.error && (
+              {google.error && (
                 <div className="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-[11.5px] text-rose-700 dark:border-rose-900/50 dark:bg-rose-900/20 dark:text-rose-300">
-                  {google.error}
+                  ⚠ {google.error}
                 </div>
               )}
               {google.status?.connected && (
-                <div className="mt-3 border-t border-[var(--border)] pt-3 text-[11px] text-[var(--text-subtle)]">
-                  {google.events.length > 0
-                    ? `${google.events.length} événement${google.events.length > 1 ? "s" : ""} sur les 60 prochains jours`
-                    : "Aucun événement chargé pour le moment"}
+                <div className="mt-3 flex items-center justify-between border-t border-[var(--border)] pt-3 text-[11px] text-[var(--text-subtle)]">
+                  <span>
+                    {google.loading
+                      ? "Chargement…"
+                      : google.events.length > 0
+                        ? `${google.events.length} événement${google.events.length > 1 ? "s" : ""} sur les 60 prochains jours`
+                        : "Aucun événement chargé"}
+                  </span>
+                  <button
+                    onClick={() => google.refresh()}
+                    disabled={google.loading}
+                    className="rounded px-2 py-0.5 text-[11px] font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)] disabled:opacity-50"
+                  >
+                    {google.loading ? "…" : "Actualiser"}
+                  </button>
                 </div>
               )}
             </div>

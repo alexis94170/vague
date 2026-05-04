@@ -59,10 +59,12 @@ export async function fetchEvents(fromISO: string, toISO: string): Promise<Googl
     headers: await authHeaders(),
   });
   if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
     if (res.status === 401) return [];
-    throw new Error(`Fetch events: ${res.status}`);
+    throw new Error(body.error ?? `Erreur ${res.status}`);
   }
   const data = await res.json() as { events?: GoogleEvent[]; error?: string };
+  if (data.error && data.error !== "not-connected") throw new Error(data.error);
   return data.events ?? [];
 }
 
