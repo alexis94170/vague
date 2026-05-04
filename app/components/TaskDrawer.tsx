@@ -447,6 +447,12 @@ function SubtaskList({
 function SectionAdd({ onAdd }: { onAdd: (name: string) => void }) {
   const [v, setV] = useState("");
   const [open, setOpen] = useState(false);
+  function submit() {
+    if (!v.trim()) return;
+    onAdd(v);
+    setV("");
+    setOpen(false);
+  }
   if (!open) {
     return (
       <button
@@ -459,25 +465,36 @@ function SectionAdd({ onAdd }: { onAdd: (name: string) => void }) {
     );
   }
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (v.trim()) onAdd(v);
-        setV("");
-        setOpen(false);
-      }}
-      className="flex items-center gap-2 rounded-md px-2 py-1"
-    >
+    <div className="flex items-center gap-2 rounded-md px-2 py-1">
       <Icon name="plus" size={11} className="text-[var(--text-subtle)]" />
       <input
         autoFocus
         value={v}
         onChange={(e) => setV(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            e.stopPropagation();
+            submit();
+          } else if (e.key === "Escape") {
+            setV("");
+            setOpen(false);
+          }
+        }}
         onBlur={() => { if (!v.trim()) setOpen(false); }}
         placeholder="Nom de la catégorie (ex: Préparation, Cuisson…)"
         className="flex-1 bg-transparent text-[12px] uppercase tracking-wider outline-none placeholder:text-[var(--text-subtle)] placeholder:normal-case placeholder:tracking-normal"
       />
-    </form>
+      {v.trim() && (
+        <button
+          type="button"
+          onClick={submit}
+          className="rounded-md bg-[var(--accent)] px-2 py-0.5 text-[10.5px] font-medium text-white"
+        >
+          OK
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -545,24 +562,38 @@ function Field({ label, icon, children }: { label: string; icon: Parameters<type
 
 function SubtaskAdd({ onAdd, placeholder = "Ajouter une sous-tâche" }: { onAdd: (title: string) => void; placeholder?: string }) {
   const [v, setV] = useState("");
+  function submit() {
+    if (!v.trim()) return;
+    onAdd(v);
+    setV("");
+  }
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        onAdd(v);
-        setV("");
-      }}
-      className="flex items-center gap-2 rounded-md px-2 py-1"
-    >
+    <div className="flex items-center gap-2 rounded-md px-2 py-1">
       <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded border-[1.5px] border-dashed border-[var(--border-strong)] text-[var(--text-subtle)]">
         <Icon name="plus" size={10} />
       </span>
       <input
         value={v}
         onChange={(e) => setV(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            e.stopPropagation();
+            submit();
+          }
+        }}
         placeholder={placeholder}
         className="flex-1 bg-transparent text-[13px] outline-none placeholder:text-[var(--text-subtle)]"
       />
-    </form>
+      {v.trim() && (
+        <button
+          type="button"
+          onClick={submit}
+          className="rounded-md bg-[var(--accent)] px-2 py-0.5 text-[10.5px] font-medium text-white"
+        >
+          OK
+        </button>
+      )}
+    </div>
   );
 }
