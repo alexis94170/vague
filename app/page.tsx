@@ -20,6 +20,7 @@ import DailyPlan from "./components/DailyPlan";
 import AssistantChat from "./components/AssistantChat";
 import CalendarView from "./components/CalendarView";
 import AgendaView from "./components/AgendaView";
+import TodayView from "./components/TodayView";
 import Dashboard from "./components/Dashboard";
 import PomodoroWidget from "./components/PomodoroWidget";
 import Notifications from "./components/Notifications";
@@ -224,6 +225,8 @@ export default function Home() {
             <CalendarView onOpenTask={setOpenTaskId} />
           ) : view.kind === "agenda" ? (
             <AgendaView onOpenTask={setOpenTaskId} />
+          ) : view.kind === "today" ? (
+            <TodayView onOpenTask={setOpenTaskId} />
           ) : loading && tasks.length === 0 ? (
             <TaskSkeleton rows={8} />
           ) : (
