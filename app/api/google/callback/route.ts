@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { supabaseServer } from "../../../lib/supabase-server";
-import { exchangeCode, fetchUserEmail, saveTokens } from "../../../lib/google-server";
+import { exchangeCode, fetchUserEmail, saveAccount, syncCalendars } from "../../../lib/google-server";
 
 export const runtime = "nodejs";
 
@@ -14,7 +14,6 @@ export async function GET(req: NextRequest) {
   const state = url.searchParams.get("state");
   const errorParam = url.searchParams.get("error");
 
-  // User declined
   if (errorParam) {
     return Response.redirect(`${url.origin}/?google=denied`, 302);
   }
@@ -36,7 +35,6 @@ export async function GET(req: NextRequest) {
     return Response.redirect(`${url.origin}/?google=error&reason=csrf`, 302);
   }
 
-  // Verify user still authenticated
   const sb = await supabaseServer();
   const { data: userData, error: userErr } = await sb.auth.getUser();
   if (userErr || !userData.user) {
@@ -44,7 +42,6 @@ export async function GET(req: NextRequest) {
   }
   const user = userData.user;
 
-  // userId in state must match
   const [stateUserId] = state.split(".");
   if (stateUserId !== user.id) {
     return Response.redirect(`${url.origin}/?google=error&reason=user-mismatch`, 302);
@@ -53,19 +50,27 @@ export async function GET(req: NextRequest) {
   try {
     const tokens = await exchangeCode(code, req.url);
     const email = await fetchUserEmail(tokens.access_token);
-    await saveTokens(sb, user.id, {
+    if (!email) {
+      return Response.redirect(`${url.origin}/?google=error&reason=no-email`, 302);
+    }
+    const account = await saveAccount(sb, user.id, {
       access_token: tokens.access_token,
       refresh_token: tokens.refresh_token,
       expires_in: tokens.expires_in,
       scope: tokens.scope,
       email,
     });
+    // Sync the user's calendars right away
+    try {
+      await syncCalendars(sb, account.id, tokens.access_token);
+    } catch (e) {
+      console.error("syncCalendars failed (non-fatal):", e);
+    }
   } catch (e) {
     console.error("OAuth callback failed:", e);
     return Response.redirect(`${url.origin}/?google=error&reason=exchange-failed`, 302);
   }
 
-  // Clear state cookie + redirect to settings
   const res = new Response(null, { status: 302 });
   res.headers.set("Location", `${url.origin}/?google=connected`);
   res.headers.set(

@@ -178,20 +178,27 @@ export default function CalendarView({ onOpenTask }: Props) {
                 </div>
               </div>
               <div className="flex flex-col gap-0.5">
-                {visibleEvents.map((e) => (
-                  <div
-                    key={e.id}
-                    onClick={(ev) => {
-                      ev.stopPropagation();
-                      if (e.htmlLink) window.open(e.htmlLink, "_blank", "noopener,noreferrer");
-                    }}
-                    className="flex items-center gap-1 truncate rounded bg-[var(--accent-soft)] px-1.5 py-0.5 text-left text-[10.5px] text-[var(--accent)]"
-                    style={{ borderLeft: "2px solid var(--accent)" }}
-                    title={e.summary}
-                  >
-                    <span className="truncate">{e.summary || "(Sans titre)"}</span>
-                  </div>
-                ))}
+                {visibleEvents.map((e) => {
+                  const color = e.__calendarColor ?? "var(--accent)";
+                  return (
+                    <div
+                      key={e.id}
+                      onClick={(ev) => {
+                        ev.stopPropagation();
+                        if (e.htmlLink) window.open(e.htmlLink, "_blank", "noopener,noreferrer");
+                      }}
+                      className="flex items-center gap-1 truncate rounded px-1.5 py-0.5 text-left text-[10.5px]"
+                      style={{
+                        borderLeft: `2px solid ${color}`,
+                        background: `color-mix(in srgb, ${color} 12%, transparent)`,
+                        color,
+                      }}
+                      title={`${e.summary ?? ""}${e.__calendarName ? ` · ${e.__calendarName}` : ""}`}
+                    >
+                      <span className="truncate">{e.summary || "(Sans titre)"}</span>
+                    </div>
+                  );
+                })}
                 {visibleTasks.map((t) => {
                   const project = t.projectId ? projectsById.get(t.projectId) : null;
                   return (

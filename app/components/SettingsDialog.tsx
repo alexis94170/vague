@@ -28,15 +28,15 @@ export default function SettingsDialog({ open, onClose }: Props) {
       setNotifPerm(notificationPermission());
       isSubscribed().then(setPushOn);
       setAiCost(getAiCostSummary());
-      google.refreshStatus();
+      google.refreshAccounts();
     }
   }, [open]);
 
-  async function disconnectGoogle() {
-    if (!confirm("Déconnecter Google Calendar ?")) return;
+  async function disconnectAccount(accountId: string, email: string) {
+    if (!confirm(`Déconnecter le compte ${email} ?`)) return;
     setGoogleBusy(true);
     try {
-      await google.disconnect();
+      await google.disconnect(accountId);
     } finally {
       setGoogleBusy(false);
     }
@@ -234,54 +234,113 @@ export default function SettingsDialog({ open, onClose }: Props) {
           {/* Google Calendar */}
           <section>
             <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">Agenda Google</h3>
-            <div className="rounded-xl border border-[var(--border)] bg-[var(--bg)] p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0 flex items-center gap-3">
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-soft)]">
-                    <svg viewBox="0 0 24 24" className="h-5 w-5 text-[var(--accent)]" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="3" y="4" width="18" height="18" rx="2" />
-                      <path d="M16 2v4M8 2v4M3 10h18" />
-                    </svg>
-                  </span>
-                  <div className="min-w-0">
-                    <div className="text-[13px] font-medium">Google Calendar</div>
-                    <div className="mt-0.5 truncate text-[11.5px] text-[var(--text-muted)]">
-                      {google.status?.connected
-                        ? `Connecté · ${google.status.email ?? "compte Google"}`
-                        : "Voir tes événements et créer des plages depuis tes tâches"}
+
+            {!google.isConnected ? (
+              // Empty state
+              <div className="rounded-xl border border-[var(--border)] bg-[var(--bg)] p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0 flex items-center gap-3">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-soft)]">
+                      <svg viewBox="0 0 24 24" className="h-5 w-5 text-[var(--accent)]" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="4" width="18" height="18" rx="2" />
+                        <path d="M16 2v4M8 2v4M3 10h18" />
+                      </svg>
+                    </span>
+                    <div className="min-w-0">
+                      <div className="text-[13px] font-medium">Aucun compte connecté</div>
+                      <div className="mt-0.5 text-[11.5px] text-[var(--text-muted)]">
+                        Connecte un ou plusieurs agendas Google
+                      </div>
                     </div>
                   </div>
-                </div>
-                {google.status?.connected ? (
-                  <button
-                    onClick={disconnectGoogle}
-                    disabled={googleBusy}
-                    className="shrink-0 rounded-md border border-[var(--border)] bg-[var(--bg-elev)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-muted)] transition hover:border-rose-300 hover:text-rose-600 disabled:opacity-50"
-                  >
-                    Déconnecter
-                  </button>
-                ) : (
                   <a
                     href="/api/google/auth"
                     className="shrink-0 rounded-md bg-[var(--accent)] px-3 py-1.5 text-[12px] font-medium text-[var(--accent-fg)] transition active:scale-95"
                   >
                     Connecter
                   </a>
-                )}
-              </div>
-              {google.error && (
-                <div className="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-[11.5px] text-rose-700 dark:border-rose-900/50 dark:bg-rose-900/20 dark:text-rose-300">
-                  ⚠ {google.error}
                 </div>
-              )}
-              {google.status?.connected && (
-                <div className="mt-3 flex items-center justify-between border-t border-[var(--border)] pt-3 text-[11px] text-[var(--text-subtle)]">
+              </div>
+            ) : (
+              // Connected accounts list
+              <div className="space-y-2">
+                {google.accounts.map((account) => {
+                  const calendars = google.calendars
+                    .filter((c) => c.account_id === account.id)
+                    .sort((a, b) => (a.is_primary ? -1 : b.is_primary ? 1 : (a.name ?? "").localeCompare(b.name ?? "")));
+                  const enabledCount = calendars.filter((c) => c.enabled).length;
+                  return (
+                    <div key={account.id} className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg)]">
+                      {/* Account header */}
+                      <div className="flex items-center justify-between gap-3 px-4 py-3">
+                        <div className="min-w-0 flex items-center gap-3">
+                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent)]">
+                            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                              <rect x="3" y="4" width="18" height="18" rx="2" />
+                              <path d="M16 2v4M8 2v4M3 10h18" />
+                            </svg>
+                          </span>
+                          <div className="min-w-0">
+                            <div className="truncate text-[13px] font-medium">{account.email}</div>
+                            <div className="mt-0.5 text-[11px] text-[var(--text-subtle)]">
+                              {enabledCount}/{calendars.length} calendrier{calendars.length > 1 ? "s" : ""} actif{enabledCount > 1 ? "s" : ""}
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => disconnectAccount(account.id, account.email)}
+                          disabled={googleBusy}
+                          className="shrink-0 rounded-md px-2 py-1 text-[11.5px] font-medium text-[var(--text-muted)] transition hover:bg-[var(--bg-hover)] hover:text-rose-600 disabled:opacity-50"
+                        >
+                          Déconnecter
+                        </button>
+                      </div>
+
+                      {/* Calendars list */}
+                      {calendars.length > 0 && (
+                        <div className="border-t border-[var(--border)] divide-y divide-[var(--border)]/60">
+                          {calendars.map((cal) => (
+                            <label
+                              key={cal.id}
+                              className="flex cursor-pointer items-center gap-3 px-4 py-2 hover:bg-[var(--bg-hover)]/50"
+                            >
+                              <span
+                                className="h-2.5 w-2.5 shrink-0 rounded-full"
+                                style={{ background: cal.color ?? "var(--text-subtle)" }}
+                              />
+                              <span className="min-w-0 flex-1 truncate text-[12.5px]">
+                                {cal.name ?? "(Sans nom)"}
+                                {cal.is_primary && <span className="ml-2 text-[10px] text-[var(--text-subtle)]">primaire</span>}
+                              </span>
+                              <input
+                                type="checkbox"
+                                checked={cal.enabled}
+                                onChange={(e) => google.toggleCalendar(cal.id, e.target.checked)}
+                                className="h-4 w-4 cursor-pointer accent-[var(--accent)]"
+                              />
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {/* Add another account */}
+                <a
+                  href="/api/google/auth"
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--border)] bg-transparent px-4 py-3 text-[12.5px] font-medium text-[var(--text-muted)] transition hover:border-[var(--accent)]/40 hover:text-[var(--accent)]"
+                >
+                  <Icon name="plus" size={13} />
+                  Ajouter un autre compte
+                </a>
+
+                {/* Refresh / status */}
+                <div className="flex items-center justify-between px-1 pt-1 text-[11px] text-[var(--text-subtle)]">
                   <span>
                     {google.loading
                       ? "Chargement…"
-                      : google.events.length > 0
-                        ? `${google.events.length} événement${google.events.length > 1 ? "s" : ""} sur les 60 prochains jours`
-                        : "Aucun événement chargé"}
+                      : `${google.events.length} événement${google.events.length > 1 ? "s" : ""}`}
                   </span>
                   <button
                     onClick={() => google.refresh()}
@@ -291,8 +350,23 @@ export default function SettingsDialog({ open, onClose }: Props) {
                     {google.loading ? "…" : "Actualiser"}
                   </button>
                 </div>
-              )}
-            </div>
+
+                {/* Errors per account */}
+                {google.errors.length > 0 && (
+                  <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[11.5px] text-amber-800 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-300">
+                    {google.errors.slice(0, 3).map((e, i) => (
+                      <div key={i}>⚠ {e}</div>
+                    ))}
+                    {google.errors.length > 3 && <div>+ {google.errors.length - 3} autres</div>}
+                  </div>
+                )}
+                {google.error && (
+                  <div className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-[11.5px] text-rose-700 dark:border-rose-900/50 dark:bg-rose-900/20 dark:text-rose-300">
+                    ⚠ {google.error}
+                  </div>
+                )}
+              </div>
+            )}
           </section>
 
           {/* Utilisation IA */}

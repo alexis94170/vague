@@ -1,12 +1,12 @@
 import { NextRequest } from "next/server";
 import { requireUser } from "../../../lib/supabase-server";
-import { getValidAccessToken, listEvents } from "../../../lib/google-server";
+import { listAllUserEvents } from "../../../lib/google-server";
 
 export const runtime = "nodejs";
 
 /**
  * GET /api/google/events?from=ISO&to=ISO
- * Returns events between [from, to[ from the user's primary calendar.
+ * Returns events from ALL the user's connected accounts and ENABLED calendars.
  */
 export async function GET(req: NextRequest) {
   try {
@@ -19,13 +19,8 @@ export async function GET(req: NextRequest) {
       return Response.json({ error: "from + to requis (ISO 8601)" }, { status: 400 });
     }
 
-    const accessToken = await getValidAccessToken(sb, user.id);
-    if (!accessToken) {
-      return Response.json({ error: "not-connected", events: [] }, { status: 200 });
-    }
-
-    const events = await listEvents(accessToken, { timeMin: from, timeMax: to });
-    return Response.json({ events });
+    const { events, errors } = await listAllUserEvents(sb, user.id, from, to);
+    return Response.json({ events, errors });
   } catch (e) {
     if (e instanceof Response) return e;
     console.error("events route error:", e);

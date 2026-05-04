@@ -1,27 +1,28 @@
 import { NextRequest } from "next/server";
 import { requireUser } from "../../../lib/supabase-server";
-import { deleteTokens, loadTokens } from "../../../lib/google-server";
+import { deleteAccount } from "../../../lib/google-server";
 
 export const runtime = "nodejs";
 
 /**
  * POST /api/google/disconnect
- * Revokes the Google OAuth tokens server-side and removes from DB.
+ * Body: { accountId?: string } — if omitted, disconnects ALL accounts.
  */
-export async function POST(_req: NextRequest) {
+export async function POST(req: NextRequest) {
   try {
     const { user, sb } = await requireUser();
-    const tokens = await loadTokens(sb, user.id);
-    if (tokens?.access_token) {
-      // Best-effort revoke
-      try {
-        await fetch(`https://oauth2.googleapis.com/revoke?token=${encodeURIComponent(tokens.access_token)}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        });
-      } catch {}
+    const body = (await req.json().catch(() => ({}))) as { accountId?: string };
+
+    if (body.accountId) {
+      await deleteAccount(sb, user.id, body.accountId);
+    } else {
+      // Disconnect all
+      const { data } = await sb.from("google_tokens").select("id").eq("user_id", user.id);
+      const ids = ((data as Array<{ id: string }> | null) ?? []).map((r) => r.id);
+      for (const id of ids) {
+        await deleteAccount(sb, user.id, id);
+      }
     }
-    await deleteTokens(sb, user.id);
     return Response.json({ ok: true });
   } catch (e) {
     if (e instanceof Response) return e;

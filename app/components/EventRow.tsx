@@ -11,6 +11,7 @@ type Props = {
 export default function EventRow({ event, compact }: Props) {
   const allDay = isAllDay(event);
   const duration = !allDay ? eventDurationMinutes(event) : 0;
+  const color = event.__calendarColor ?? "var(--accent)";
 
   return (
     <a
@@ -19,15 +20,18 @@ export default function EventRow({ event, compact }: Props) {
       rel="noopener noreferrer"
       className="group flex items-start gap-3 px-4 py-3 transition-colors hover:bg-[var(--bg-hover)]/40 sm:py-2.5"
     >
-      {/* Vertical accent bar */}
+      {/* Vertical accent bar — calendar color */}
       <div className="mt-0.5 flex flex-col items-center self-stretch">
-        <span className="block h-full w-[3px] rounded-full bg-[var(--accent)]/60" style={{ minHeight: 22 }} />
+        <span
+          className="block h-full w-[3px] rounded-full"
+          style={{ background: color, minHeight: 22, opacity: 0.8 }}
+        />
       </div>
 
       <div className="min-w-0 flex-1">
         <div className="flex items-start gap-2">
-          <span className="mt-[3px] inline-block">
-            <Icon name="calendar" size={11} className="text-[var(--accent)]" />
+          <span className="mt-[3px] inline-block" style={{ color }}>
+            <Icon name="calendar" size={11} />
           </span>
           <div className="min-w-0 flex-1">
             <div className={`break-words ${compact ? "text-[13.5px]" : "text-[14.5px]"} font-medium leading-snug text-[var(--text-strong)]`}>
@@ -40,6 +44,9 @@ export default function EventRow({ event, compact }: Props) {
               )}
               {event.location && (
                 <span className="truncate">📍 {event.location}</span>
+              )}
+              {event.__calendarName && (
+                <span className="truncate text-[var(--text-subtle)]">{event.__calendarName}</span>
               )}
             </div>
           </div>

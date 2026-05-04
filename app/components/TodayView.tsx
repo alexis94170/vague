@@ -66,7 +66,7 @@ function eventTimeSlot(e: GoogleEvent): "allday" | "morning" | "afternoon" | "ev
 
 export default function TodayView({ onOpenTask }: Props) {
   const { tasks, restoreTasks, deleteTasks } = useStore();
-  const { eventsForDate, status: googleStatus } = useGoogle();
+  const { eventsForDate } = useGoogle();
   const toast = useToast();
   const [showCompleted, setShowCompleted] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());

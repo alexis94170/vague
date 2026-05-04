@@ -80,7 +80,7 @@ export default function Home() {
     if (!g) return;
     if (g === "connected") {
       toast.show({ message: "Google Calendar connecté 🌊" });
-      google.refreshStatus();
+      google.refreshAccounts();
     } else if (g === "denied") {
       toast.show({ message: "Connexion annulée." });
     } else if (g === "error") {

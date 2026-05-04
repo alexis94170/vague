@@ -271,7 +271,7 @@ export default function Dashboard({ onOpenPlan, onOpenChat, onNavigate }: Props)
       </div>
 
       {/* Today's events (if Google connected) */}
-      {google.status?.connected && todayEvents.length > 0 && (
+      {google.isConnected && todayEvents.length > 0 && (
         <section className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-elev)]">
           <header className="flex items-center justify-between px-5 pt-4 pb-2">
             <div className="flex items-center gap-2.5">
@@ -416,6 +416,7 @@ function StatCard({
 function DashboardEventRow({ event }: { event: GoogleEvent }) {
   const allDay = isAllDay(event);
   const start = !allDay ? eventStart(event) : null;
+  const color = event.__calendarColor ?? "var(--accent)";
   return (
     <a
       href={event.htmlLink}
@@ -439,16 +440,23 @@ function DashboardEventRow({ event }: { event: GoogleEvent }) {
           </>
         )}
       </span>
-      <span className="block h-9 w-[2px] shrink-0 rounded-full bg-[var(--accent)]/50" />
+      <span
+        className="block h-9 w-[3px] shrink-0 rounded-full"
+        style={{ background: color, opacity: 0.7 }}
+      />
       <div className="min-w-0 flex-1">
         <div className="truncate text-[13.5px] font-medium text-[var(--text-strong)]">
           {event.summary || "(Sans titre)"}
         </div>
-        {event.location && (
-          <div className="mt-0.5 truncate text-[11px] text-[var(--text-muted)]">
-            📍 {event.location}
-          </div>
-        )}
+        <div className="mt-0.5 flex items-center gap-1.5 truncate text-[11px] text-[var(--text-muted)]">
+          {event.__calendarName && <span className="truncate">{event.__calendarName}</span>}
+          {event.location && (
+            <>
+              {event.__calendarName && <span className="text-[var(--text-subtle)]">·</span>}
+              <span className="truncate">📍 {event.location}</span>
+            </>
+          )}
+        </div>
       </div>
     </a>
   );

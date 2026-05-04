@@ -26,6 +26,7 @@ export default function TaskDrawer({ taskId, onClose, onFocus }: Props) {
 
   const [draft, setDraft] = useState<Task | null>(task);
   const [creatingEvent, setCreatingEvent] = useState(false);
+  const [showCalendarPicker, setShowCalendarPicker] = useState(false);
 
   useEffect(() => {
     setDraft(task);
@@ -81,30 +82,31 @@ export default function TaskDrawer({ taskId, onClose, onFocus }: Props) {
     save({ tags });
   }
 
-  async function blockInCalendar() {
+  async function blockInCalendar(opts?: { accountId?: string; calendarId?: string }) {
     if (!draft) return;
     setCreatingEvent(true);
     try {
-      // Determine start/end
       const dateStr = draft.dueDate || new Date().toISOString().slice(0, 10);
       const timeStr = draft.dueTime || "09:00";
       const startDate = new Date(`${dateStr}T${timeStr}:00`);
       const duration = draft.estimateMinutes || 30;
       const endDate = new Date(startDate.getTime() + duration * 60_000);
 
-      await createCalendarEvent({
+      const result = await createCalendarEvent({
         summary: draft.title,
         description: draft.notes,
         start: startDate.toISOString(),
         end: endDate.toISOString(),
+        accountId: opts?.accountId,
+        calendarId: opts?.calendarId,
       });
-      // refresh agenda
       await google.refresh();
-      toast.show({ message: "Bloqué dans ton agenda 🌊" });
+      toast.show({ message: `Bloqué sur ${result.accountEmail} 🌊` });
     } catch (e) {
       toast.show({ message: `Échec : ${(e as Error).message}` });
     } finally {
       setCreatingEvent(false);
+      setShowCalendarPicker(false);
     }
   }
 
@@ -181,16 +183,64 @@ export default function TaskDrawer({ taskId, onClose, onFocus }: Props) {
 
           {!draft.done && (
             <div className="mt-4 ml-8 flex flex-wrap gap-2">
-              {google.status?.connected && (
-                <button
-                  onClick={blockInCalendar}
-                  disabled={creatingEvent}
-                  className="flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--bg)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-muted)] transition hover:border-[var(--accent)]/40 hover:text-[var(--accent)] active:scale-95 disabled:opacity-50"
-                  title="Créer un événement dans Google Agenda"
-                >
-                  <Icon name="calendar" size={12} />
-                  {creatingEvent ? "Création…" : "Bloquer dans l'agenda"}
-                </button>
+              {google.isConnected && (
+                <div className="relative">
+                  <button
+                    onClick={() => {
+                      // If only 1 account with 1 calendar, do directly
+                      if (google.accounts.length === 1 && google.calendars.filter((c) => c.account_id === google.accounts[0].id).length <= 1) {
+                        blockInCalendar();
+                      } else {
+                        setShowCalendarPicker((v) => !v);
+                      }
+                    }}
+                    disabled={creatingEvent}
+                    className="flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--bg)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-muted)] transition hover:border-[var(--accent)]/40 hover:text-[var(--accent)] active:scale-95 disabled:opacity-50"
+                    title="Créer un événement dans Google Agenda"
+                  >
+                    <Icon name="calendar" size={12} />
+                    {creatingEvent ? "Création…" : "Bloquer dans l'agenda"}
+                    {google.accounts.length > 1 || google.calendars.length > 1 ? (
+                      <Icon name="chevron-right" size={11} className="rotate-90" />
+                    ) : null}
+                  </button>
+                  {showCalendarPicker && (
+                    <>
+                      <div className="fixed inset-0 z-30" onClick={() => setShowCalendarPicker(false)} />
+                      <div className="absolute left-0 top-full z-40 mt-1 w-72 max-h-80 overflow-y-auto rounded-xl border border-[var(--border)] bg-[var(--bg-elev)] p-1 shadow-lg anim-scale-in">
+                        {google.accounts.map((account) => {
+                          const cals = google.calendars.filter((c) => c.account_id === account.id && c.enabled);
+                          if (cals.length === 0) return null;
+                          return (
+                            <div key={account.id}>
+                              <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+                                {account.email}
+                              </div>
+                              {cals.map((cal) => (
+                                <button
+                                  key={cal.id}
+                                  onClick={() => blockInCalendar({ accountId: account.id, calendarId: cal.calendar_id })}
+                                  className="flex w-full items-center gap-2.5 rounded-md px-3 py-1.5 text-left text-[13px] transition hover:bg-[var(--bg-hover)]"
+                                >
+                                  <span
+                                    className="h-2.5 w-2.5 shrink-0 rounded-full"
+                                    style={{ background: cal.color ?? "var(--text-subtle)" }}
+                                  />
+                                  <span className="flex-1 truncate">
+                                    {cal.name ?? "(Sans nom)"}
+                                    {cal.is_primary && (
+                                      <span className="ml-1.5 text-[10px] text-[var(--text-subtle)]">primaire</span>
+                                    )}
+                                  </span>
+                                </button>
+                              ))}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
+                </div>
               )}
               <button
                 onClick={() => {

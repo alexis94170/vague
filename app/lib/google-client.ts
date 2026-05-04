@@ -11,15 +11,30 @@ export type GoogleEvent = {
   end: { dateTime?: string; date?: string; timeZone?: string };
   htmlLink?: string;
   status?: string;
+  // Server-enriched
+  __accountEmail?: string;
+  __accountId?: string;
+  __calendarId?: string;
+  __calendarName?: string;
+  __calendarColor?: string;
 };
 
-export type GoogleStatus = {
-  connected: boolean;
-  email: string | null;
+export type GoogleAccount = {
+  id: string;
+  email: string;
 };
 
-const CACHE_KEY = "vague:google:events:v1";
-const STATUS_KEY = "vague:google:status:v1";
+export type GoogleCalendar = {
+  id: string;
+  account_id: string;
+  calendar_id: string;
+  name: string | null;
+  color: string | null;
+  enabled: boolean;
+  is_primary: boolean;
+};
+
+const CACHE_KEY = "vague:google:cache:v2";
 
 async function authHeaders(): Promise<HeadersInit> {
   const { data } = await supabase().auth.getSession();
@@ -27,32 +42,56 @@ async function authHeaders(): Promise<HeadersInit> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-export async function getStatus(): Promise<GoogleStatus> {
-  try {
-    const res = await fetch("/api/google/status", {
-      credentials: "include",
-      headers: await authHeaders(),
-    });
-    if (!res.ok) return { connected: false, email: null };
-    const data = await res.json() as GoogleStatus;
-    try { localStorage.setItem(STATUS_KEY, JSON.stringify(data)); } catch {}
-    return data;
-  } catch {
-    return { connected: false, email: null };
+// === Accounts + calendars ===
+
+export async function fetchAccounts(): Promise<{
+  accounts: GoogleAccount[];
+  calendars: GoogleCalendar[];
+}> {
+  const res = await fetch("/api/google/accounts", {
+    credentials: "include",
+    headers: await authHeaders(),
+  });
+  if (!res.ok) {
+    if (res.status === 401) return { accounts: [], calendars: [] };
+    throw new Error(`Accounts: ${res.status}`);
+  }
+  const data = await res.json() as {
+    accounts?: GoogleAccount[];
+    calendars?: GoogleCalendar[];
+  };
+  return { accounts: data.accounts ?? [], calendars: data.calendars ?? [] };
+}
+
+export async function toggleCalendar(calendarRowId: string, enabled: boolean): Promise<void> {
+  const res = await fetch("/api/google/calendars/toggle", {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json", ...(await authHeaders()) },
+    body: JSON.stringify({ calendarRowId, enabled }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error ?? `HTTP ${res.status}`);
   }
 }
 
-export function getCachedStatus(): GoogleStatus | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = localStorage.getItem(STATUS_KEY);
-    return raw ? (JSON.parse(raw) as GoogleStatus) : null;
-  } catch {
-    return null;
-  }
+export async function disconnectAccount(accountId?: string): Promise<void> {
+  const res = await fetch("/api/google/disconnect", {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json", ...(await authHeaders()) },
+    body: JSON.stringify(accountId ? { accountId } : {}),
+  });
+  if (!res.ok) throw new Error(`Disconnect: ${res.status}`);
 }
 
-export async function fetchEvents(fromISO: string, toISO: string): Promise<GoogleEvent[]> {
+// === Events ===
+
+export async function fetchEvents(fromISO: string, toISO: string): Promise<{
+  events: GoogleEvent[];
+  errors: string[];
+}> {
   const params = new URLSearchParams({ from: fromISO, to: toISO });
   const res = await fetch(`/api/google/events?${params}`, {
     credentials: "include",
@@ -60,48 +99,23 @@ export async function fetchEvents(fromISO: string, toISO: string): Promise<Googl
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
-    if (res.status === 401) return [];
-    throw new Error(body.error ?? `Erreur ${res.status}`);
+    if (res.status === 401) return { events: [], errors: [] };
+    throw new Error((body as { error?: string }).error ?? `Erreur ${res.status}`);
   }
-  const data = await res.json() as { events?: GoogleEvent[]; error?: string };
-  if (data.error && data.error !== "not-connected") throw new Error(data.error);
-  return data.events ?? [];
+  const data = await res.json() as { events?: GoogleEvent[]; errors?: string[] };
+  return { events: data.events ?? [], errors: data.errors ?? [] };
 }
 
-export type CachedEvents = {
-  fromISO: string;
-  toISO: string;
-  fetchedAt: number;
-  events: GoogleEvent[];
-};
-
-export function getCachedEvents(): CachedEvents | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = localStorage.getItem(CACHE_KEY);
-    return raw ? (JSON.parse(raw) as CachedEvents) : null;
-  } catch {
-    return null;
-  }
-}
-
-export function setCachedEvents(c: CachedEvents) {
-  try { localStorage.setItem(CACHE_KEY, JSON.stringify(c)); } catch {}
-}
-
-export function clearCachedEvents() {
-  try {
-    localStorage.removeItem(CACHE_KEY);
-    localStorage.removeItem(STATUS_KEY);
-  } catch {}
-}
+// === Create event ===
 
 export async function createCalendarEvent(opts: {
   summary: string;
   description?: string;
-  start: string; // ISO
-  end: string; // ISO
-}): Promise<GoogleEvent> {
+  start: string;
+  end: string;
+  accountId?: string;
+  calendarId?: string;
+}): Promise<{ event: GoogleEvent; accountEmail: string }> {
   const res = await fetch("/api/google/create-event", {
     method: "POST",
     credentials: "include",
@@ -110,19 +124,36 @@ export async function createCalendarEvent(opts: {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: "Erreur inconnue" }));
-    throw new Error(err.error ?? `HTTP ${res.status}`);
+    throw new Error((err as { error?: string }).error ?? `HTTP ${res.status}`);
   }
-  const data = await res.json() as { event: GoogleEvent };
-  return data.event;
+  return res.json();
 }
 
-export async function disconnect(): Promise<void> {
-  await fetch("/api/google/disconnect", {
-    method: "POST",
-    credentials: "include",
-    headers: await authHeaders(),
-  });
-  clearCachedEvents();
+// === Local cache ===
+
+export type Cache = {
+  accounts: GoogleAccount[];
+  calendars: GoogleCalendar[];
+  events: GoogleEvent[];
+  fetchedAt: number;
+};
+
+export function getCache(): Cache | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    return raw ? (JSON.parse(raw) as Cache) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setCache(c: Cache) {
+  try { localStorage.setItem(CACHE_KEY, JSON.stringify(c)); } catch {}
+}
+
+export function clearCache() {
+  try { localStorage.removeItem(CACHE_KEY); } catch {}
 }
 
 // === Helpers ===
@@ -140,7 +171,6 @@ export function eventEnd(e: GoogleEvent): Date {
 }
 
 export function eventDateISO(e: GoogleEvent): string {
-  // Returns YYYY-MM-DD for the event's start day in local time
   const d = eventStart(e);
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
