@@ -37,6 +37,8 @@ export type Task = {
   subtasks: Subtask[];
   recurrence?: Recurrence;
   snoozedUntil?: string;
+  /** Counts how many times this task's dueDate has been pushed back (incremented on patchTask). */
+  snoozeCount?: number;
   waiting?: boolean;
   waitingFor?: string;
   deletedAt?: string;

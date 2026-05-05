@@ -62,7 +62,32 @@ export default function DailyPlan({ open, onClose }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const r = await aiPlan(tasks, projects, { availableMinutes, focus: focus.trim() || undefined });
+      // Build calendar context for the AI
+      const events = todayEvents.map((e) => {
+        const start = new Date(e.start.dateTime ?? e.start.date ?? 0);
+        const end = new Date(e.end.dateTime ?? e.end.date ?? 0);
+        const fmt = (d: Date) => `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+        return {
+          summary: e.summary || "(Sans titre)",
+          start: fmt(start),
+          end: fmt(end),
+          calendar: e.__calendarName ?? undefined,
+        };
+      });
+      const slotsBrief = freeSlots.map((s) => ({
+        start: formatHourMinute(s.start),
+        end: formatHourMinute(s.end),
+        minutes: s.minutes,
+      }));
+      const baseWin = workDayWindow(today);
+      const win = clampToNow(baseWin, today);
+      const r = await aiPlan(tasks, projects, {
+        availableMinutes,
+        focus: focus.trim() || undefined,
+        events: isConnected ? events : undefined,
+        freeSlots: isConnected ? slotsBrief : undefined,
+        workWindow: { start: formatHourMinute(win.start), end: formatHourMinute(win.end) },
+      });
       setResult(r);
       haptic("success");
     } catch (e) {
@@ -82,38 +107,41 @@ export default function DailyPlan({ open, onClose }: Props) {
     });
   }
 
-  function apply() {
+  // Apply only the date — keep current behavior
+  function applyDateOnly() {
     const ids = Array.from(checked);
     if (ids.length === 0) return;
     patchTasks(ids, { dueDate: todayISO() });
     haptic("success");
+    toast.show({ message: `${ids.length} tâche(s) prévue(s) aujourd'hui 🌊` });
     onClose();
   }
 
-  function autoApply() {
-    const ids = Array.from(checked);
-    if (ids.length === 0) return;
-    const tasksToSchedule = ids
-      .map((id) => tasks.find((t) => t.id === id))
-      .filter((t): t is Task => !!t);
+  // Apply BOTH date and AI-suggested time per task
+  function applyWithSchedule() {
+    if (!result) return;
+    const scheduledTasks = result.schedule.filter((s) => checked.has(s.taskId));
+    if (scheduledTasks.length === 0) return;
 
-    const { scheduled, unscheduled } = autoSchedule(tasksToSchedule, freeSlots, 5);
-
-    // First, set dueDate=today for all
-    patchTasks(ids, { dueDate: today });
-    // Then set per-task dueTime based on schedule
-    for (const s of scheduled) {
-      const time = `${String(s.start.getHours()).padStart(2, "0")}:${String(s.start.getMinutes()).padStart(2, "0")}`;
-      patchTask(s.taskId, { dueTime: time });
+    let withTime = 0;
+    let withoutTime = 0;
+    for (const s of scheduledTasks) {
+      patchTask(s.taskId, {
+        dueDate: today,
+        ...(s.suggestedTime ? { dueTime: s.suggestedTime, estimateMinutes: s.durationMinutes || undefined } : {}),
+      });
+      if (s.suggestedTime) withTime++;
+      else withoutTime++;
     }
     haptic("success");
-    if (unscheduled.length > 0) {
-      toast.show({ message: `${scheduled.length} planifiées · ${unscheduled.length} sans créneau` });
+    if (withoutTime > 0) {
+      toast.show({ message: `${withTime} planifiées · ${withoutTime} sans heure 🌊` });
     } else {
-      toast.show({ message: `${scheduled.length} tâche(s) planifiée(s) 🌊` });
+      toast.show({ message: `${withTime} tâche(s) planifiée(s) avec horaire 🌊` });
     }
     onClose();
   }
+
 
   if (!open) return null;
 
@@ -246,7 +274,9 @@ export default function DailyPlan({ open, onClose }: Props) {
                     Régénérer
                   </button>
                 </div>
-                {selectedTasks.map((t) => {
+                {(result.schedule ?? []).map((s) => {
+                  const t = tasks.find((x) => x.id === s.taskId);
+                  if (!t) return null;
                   const project = t.projectId ? projectsById.get(t.projectId) : null;
                   const isChecked = checked.has(t.id);
                   return (
@@ -260,10 +290,27 @@ export default function DailyPlan({ open, onClose }: Props) {
                       <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border-[1.5px] ${
                         isChecked ? "border-[var(--accent)] bg-[var(--accent)]" : "border-[var(--border-strong)]"
                       }`}>
-                        {isChecked && <Icon name="check" size={12} className="text-white" />}
+                        {isChecked && <Icon name="check" size={12} className="text-[var(--accent-fg)]" />}
                       </span>
+                      {/* Time block */}
+                      {s.suggestedTime && (
+                        <span className="mt-0.5 flex w-14 shrink-0 flex-col items-end text-right">
+                          <span className="text-[12.5px] font-semibold tabular-nums leading-tight text-[var(--accent)]">
+                            {s.suggestedTime}
+                          </span>
+                          <span className="text-[10px] text-[var(--text-subtle)]">
+                            {s.durationMinutes}min
+                          </span>
+                        </span>
+                      )}
                       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                        <span className="truncate text-[13.5px] font-medium text-[var(--text)]">{t.title}</span>
+                        <span className="break-words text-[13.5px] font-medium leading-snug text-[var(--text)]">{t.title}</span>
+                        {/* Per-task AI reasoning */}
+                        {s.reasoning && (
+                          <span className="text-[11px] italic text-[var(--text-muted)]">
+                            ✦ {s.reasoning}
+                          </span>
+                        )}
                         <span className="flex items-center gap-2 text-[11.5px] text-[var(--text-muted)]">
                           {t.priority !== "none" && (
                             <span className={
@@ -298,22 +345,21 @@ export default function DailyPlan({ open, onClose }: Props) {
             </span>
             <div className="flex flex-wrap items-center gap-2">
               <button onClick={onClose} className="rounded-md px-3 py-1.5 text-[12.5px] text-[var(--text-muted)] hover:bg-[var(--bg-hover)]">Annuler</button>
-              {isConnected && freeSlots.length > 0 && (
-                <button
-                  onClick={autoApply}
-                  disabled={checked.size === 0}
-                  className="flex items-center gap-1.5 rounded-md border border-[var(--accent)]/40 bg-[var(--bg-elev)] px-3 py-1.5 text-[12.5px] font-medium text-[var(--accent)] transition hover:bg-[var(--accent-soft)] disabled:opacity-40"
-                  title="Place les tâches dans tes créneaux libres"
-                >
-                  <Icon name="sparkles" size={12} />
-                  Auto-planifier
-                </button>
-              )}
               <button
-                onClick={apply}
+                onClick={applyDateOnly}
                 disabled={checked.size === 0}
-                className="rounded-md bg-[var(--accent)] px-4 py-1.5 text-[12.5px] font-medium text-[var(--accent-fg)] transition hover:bg-[var(--accent-hover)] disabled:opacity-40"
+                className="rounded-md border border-[var(--border)] bg-[var(--bg-elev)] px-3 py-1.5 text-[12.5px] font-medium text-[var(--text-muted)] transition hover:text-[var(--text)] disabled:opacity-40"
+                title="Garde tes propres heures, change juste la date"
               >
+                Sans heure
+              </button>
+              <button
+                onClick={applyWithSchedule}
+                disabled={checked.size === 0}
+                className="flex items-center gap-1.5 rounded-md bg-[var(--accent)] px-4 py-1.5 text-[12.5px] font-medium text-[var(--accent-fg)] transition hover:bg-[var(--accent-hover)] disabled:opacity-40"
+                title="Avec les heures proposées par l'IA"
+              >
+                <Icon name="sparkles" size={12} />
                 Appliquer
               </button>
             </div>

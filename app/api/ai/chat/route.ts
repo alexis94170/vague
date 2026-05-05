@@ -20,11 +20,30 @@ type ProjectBrief = { id: string; name: string };
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
 
+type EventBrief = {
+  date: string;
+  start: string;
+  end: string;
+  summary: string;
+  calendar?: string;
+};
+
+type FreeSlotBrief = {
+  date: string;
+  start: string;
+  end: string;
+  minutes: number;
+};
+
 type ChatInput = {
   messages: ChatMessage[];
   tasks: TaskBrief[];
   projects: ProjectBrief[];
   today: string;
+  // Optional calendar context
+  events?: EventBrief[];
+  freeSlotsToday?: FreeSlotBrief[];
+  hasGoogleConnected?: boolean;
 };
 
 // ============= TOOLS (Claude can invoke these) =============
@@ -155,6 +174,43 @@ const TOOLS = [
       required: ["projectId"],
     },
   },
+  {
+    name: "auto_schedule",
+    description: "Place automatiquement plusieurs tâches dans les créneaux libres de l'agenda Google de l'utilisateur. Pour aujourd'hui ou un autre jour. Set dueDate=date et dueTime intelligemment selon les free slots.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        taskIds: { type: "array", items: { type: "string" }, description: "IDs des tâches à planifier" },
+        date: { type: "string", description: "Date cible YYYY-MM-DD (ex: aujourd'hui)" },
+      },
+      required: ["taskIds", "date"],
+    },
+  },
+  {
+    name: "break_down_task",
+    description: "Décompose une tâche complexe en sous-tâches actionnables et les ajoute à la tâche-mère. Utilise quand l'utilisateur dit 'décompose', 'détaille', 'étoffe cette tâche'.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        taskId: { type: "string", description: "ID de la tâche à décomposer" },
+      },
+      required: ["taskId"],
+    },
+  },
+  {
+    name: "block_calendar",
+    description: "Crée un événement Google Calendar bloqué pour une tâche. Utile pour réserver du temps focus dans ton agenda. Nécessite que la tâche ait dueDate + dueTime + estimateMinutes (sinon les calculer raisonnablement).",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        taskId: { type: "string", description: "ID de la tâche à bloquer" },
+        dueDate: { type: "string", description: "YYYY-MM-DD (si la tâche n'en a pas)" },
+        dueTime: { type: "string", description: "HH:MM (si la tâche n'en a pas)" },
+        estimateMinutes: { type: "number", description: "Durée en minutes (si la tâche n'en a pas)" },
+      },
+      required: ["taskId"],
+    },
+  },
 ];
 
 export async function POST(req: Request) {
@@ -193,23 +249,47 @@ export async function POST(req: Request) {
 
   const projectLines = body.projects.map((p) => `${p.id} = ${p.name}`).join("\n") || "(aucun)";
 
+  const eventLines = (body.events ?? [])
+    .slice(0, 60)
+    .map((e) => `- ${e.date} ${e.start}-${e.end} : ${e.summary}${e.calendar ? ` [${e.calendar}]` : ""}`)
+    .join("\n");
+
+  const slotLines = (body.freeSlotsToday ?? [])
+    .map((s) => `- ${s.start} → ${s.end} (${s.minutes} min libres)`)
+    .join("\n");
+
   const systemBlocks = [
     {
       type: "text" as const,
-      text: `Tu es Vague, un assistant de productivité qui PEUT agir sur les tâches de l'utilisateur via les tools fournis.
+      text: `Tu es Vague, un assistant de productivité expert qui agit sur les tâches ET l'agenda de l'utilisateur via tools.
 
-Style :
+STYLE :
 - Français, concret, direct, tutoiement.
 - Réponses courtes par défaut (1-3 phrases).
-- Utilise les tools QUAND L'UTILISATEUR DEMANDE UNE ACTION : créer, cocher, reporter, supprimer, modifier.
-- Quand tu utilises un tool, confirme brièvement après ("Fait · tâche ajoutée au projet X").
+- N'expose JAMAIS les IDs en texte — utilise les titres entre guillemets.
+- Quand tu utilises un tool, confirme brièvement après ("Fait — bloqué jeudi 9h").
 - Quand l'utilisateur POSE UNE QUESTION (sans demander d'action), réponds en texte sans tool.
 
-Règles pour les tools :
-- create_task : extrais intelligemment projet, priorité, tags depuis le contexte utilisateur. Si l'utilisateur dit "demain" calcule la date.
-- update_task / complete_tasks / delete_tasks / reschedule_tasks : utilise uniquement des IDs qui existent dans la liste ci-dessous.
+CAPACITÉS :
+- Créer / modifier / cocher / supprimer / reporter des tâches
+- Auto-planifier plusieurs tâches dans les créneaux libres de l'agenda Google (auto_schedule)
+- Décomposer une tâche complexe en sous-tâches actionables (break_down_task)
+- Bloquer une tâche dans Google Calendar (block_calendar)
+- Gérer les projets (créer / renommer / recolorier)
+
+UTILISATION INTELLIGENTE :
+- "Trouve-moi 2h pour la compta demain" → analyse les free slots, propose une heure, crée/modifie la tâche, bloque dans agenda si pertinent.
+- "Décompose la tâche ouverture du resto" → utilise break_down_task.
+- "Quel est mon meilleur créneau cette semaine ?" → analyse l'agenda et réponds.
+- "Planifie ma journée" → utilise auto_schedule sur les tâches urgentes/importantes.
+
+ROUND-TRIPS :
+- Tu peux enchaîner plusieurs tools dans une réponse (ex: créer une tâche + l'auto_schedule + block_calendar).
 - Si plusieurs tâches matchent un terme vague ("les courses"), demande confirmation avant d'agir.
-- Ne cite JAMAIS les IDs dans tes réponses texte — utilise les titres entre guillemets.`,
+
+LIMITES :
+- N'invente pas d'IDs. Utilise uniquement ceux fournis ci-dessous.
+- Si l'utilisateur n'a pas connecté Google, dis-le quand il demande des actions agenda.`,
       cache_control: { type: "ephemeral" as const },
     },
     {
@@ -220,7 +300,15 @@ PROJETS :
 ${projectLines}
 
 TÂCHES (${body.tasks.length}) :
-${contextLines || "(aucune)"}`,
+${contextLines || "(aucune)"}
+
+${body.hasGoogleConnected ? `=== AGENDA GOOGLE CONNECTÉ ===
+
+Événements à venir (60 prochains jours) :
+${eventLines || "(aucun)"}
+
+Créneaux libres aujourd'hui (8h-19h, hors events) :
+${slotLines || "(agenda plein ou aucun créneau ≥15min)"}` : "Google Calendar : NON connecté. Les tools auto_schedule et block_calendar ne fonctionneront pas."}`,
       cache_control: { type: "ephemeral" as const },
     },
   ];

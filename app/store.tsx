@@ -375,7 +375,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const patchTask = useCallback((id: string, patch: Partial<Task>) => {
     setState((s) => {
-      const next = s.tasks.map((t) => (t.id === id ? { ...t, ...patch } : t));
+      const next = s.tasks.map((t) => {
+        if (t.id !== id) return t;
+        // Track snoozeCount: increment when dueDate is pushed back to a later date
+        let snoozeCount = t.snoozeCount;
+        if (
+          patch.dueDate &&
+          t.dueDate &&
+          patch.dueDate !== t.dueDate &&
+          patch.dueDate > t.dueDate
+        ) {
+          snoozeCount = (t.snoozeCount ?? 0) + 1;
+        }
+        return { ...t, ...patch, snoozeCount: snoozeCount ?? t.snoozeCount };
+      });
       const task = next.find((t) => t.id === id);
       if (task && user) withSync(() => upsertTask(task, user.id), { kind: "upsertTask", task });
       return { ...s, tasks: next };

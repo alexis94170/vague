@@ -29,6 +29,7 @@ type DbTask = {
   subtasks: Subtask[];
   recurrence: Recurrence | null;
   snoozed_until: string | null;
+  snooze_count: number | null;
   waiting: boolean;
   waiting_for: string | null;
   deleted_at: string | null;
@@ -57,6 +58,7 @@ function taskFromDb(r: DbTask): Task {
     subtasks: r.subtasks ?? [],
     recurrence: r.recurrence ?? undefined,
     snoozedUntil: r.snoozed_until ?? undefined,
+    snoozeCount: r.snooze_count ?? undefined,
     waiting: r.waiting ?? false,
     waitingFor: r.waiting_for ?? undefined,
     deletedAt: r.deleted_at ?? undefined,
@@ -92,6 +94,7 @@ function taskToDb(t: Task, userId: string) {
     subtasks: t.subtasks ?? [],
     recurrence: t.recurrence ?? null,
     snoozed_until: t.snoozedUntil || null,
+    snooze_count: t.snoozeCount ?? 0,
     waiting: t.waiting ?? false,
     waiting_for: t.waitingFor || null,
     deleted_at: t.deletedAt || null,

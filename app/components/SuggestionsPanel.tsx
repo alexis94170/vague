@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useStore } from "../store";
-import { aiSuggest, Suggestion, SuggestResult } from "../lib/ai-client";
+import { useGoogle } from "../google";
+import { aiSuggest, Suggestion, SuggestResult, WeekAgendaDay } from "../lib/ai-client";
 import { addDays, todayISO } from "../lib/dates";
 import { haptic } from "../lib/haptics";
+import { isAllDay, eventStart, eventEnd } from "../lib/google-client";
+import { workDayWindow, findFreeSlots } from "../lib/calendar-utils";
 import Icon, { IconName } from "./Icon";
 
 const STORAGE_KEY = "vague:suggestions:v1";
@@ -15,12 +18,14 @@ type CachedSuggestions = {
 };
 
 const KIND_META: Record<Suggestion["kind"], { icon: IconName; color: string; label: string }> = {
-  focus: { icon: "flag", color: "text-[var(--text-muted)]", label: "À traiter" },
-  reschedule: { icon: "calendar", color: "text-[var(--text-muted)]", label: "À dater" },
-  followup: { icon: "repeat", color: "text-[var(--text-muted)]", label: "À relancer" },
-  cleanup: { icon: "trash", color: "text-[var(--text-muted)]", label: "À nettoyer" },
-  waiting: { icon: "pause", color: "text-[var(--text-muted)]", label: "En attente" },
-  insight: { icon: "sparkles", color: "text-[var(--text-muted)]", label: "Insight" },
+  focus: { icon: "flag", color: "text-rose-500", label: "À traiter" },
+  reschedule: { icon: "calendar", color: "text-amber-500", label: "À dater" },
+  followup: { icon: "repeat", color: "text-sky-500", label: "À relancer" },
+  cleanup: { icon: "trash", color: "text-zinc-500", label: "À nettoyer" },
+  waiting: { icon: "pause", color: "text-amber-500", label: "En attente" },
+  insight: { icon: "sparkles", color: "text-[var(--accent)]", label: "Insight" },
+  workload: { icon: "clock", color: "text-orange-500", label: "Charge" },
+  snoozed: { icon: "repeat", color: "text-rose-500", label: "Reportée" },
 };
 
 const ACTION_LABEL: Record<Suggestion["action"], string> = {
@@ -34,11 +39,38 @@ const ACTION_LABEL: Record<Suggestion["action"], string> = {
 
 export default function SuggestionsPanel() {
   const { tasks, projects, patchTasks, deleteTasks } = useStore();
+  const { events, isConnected: googleConnected } = useGoogle();
   const [result, setResult] = useState<SuggestResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dismissed, setDismissed] = useState<Set<number>>(new Set());
   const [collapsed, setCollapsed] = useState(false);
+
+  // Compute week agenda summary for the AI
+  const weekAgenda = useMemo<WeekAgendaDay[]>(() => {
+    if (!googleConnected) return [];
+    const today = todayISO();
+    const out: WeekAgendaDay[] = [];
+    for (let i = 0; i < 7; i++) {
+      const date = addDays(today, i);
+      const dayEvents = events.filter((e) => {
+        const start = eventStart(e);
+        const y = start.getFullYear();
+        const m = String(start.getMonth() + 1).padStart(2, "0");
+        const d = String(start.getDate()).padStart(2, "0");
+        return `${y}-${m}-${d}` === date;
+      });
+      const totalMinutes = dayEvents.reduce((sum, e) => {
+        if (isAllDay(e)) return sum;
+        return sum + Math.round((eventEnd(e).getTime() - eventStart(e).getTime()) / 60_000);
+      }, 0);
+      const win = workDayWindow(date);
+      const slots = findFreeSlots(dayEvents, win.start, win.end, 15);
+      const freeMinutes = slots.reduce((sum, s) => sum + s.minutes, 0);
+      out.push({ date, events: dayEvents.length, totalMinutes, freeMinutes });
+    }
+    return out;
+  }, [events, googleConnected]);
 
   useEffect(() => {
     // Load cached suggestions for today
@@ -61,7 +93,7 @@ export default function SuggestionsPanel() {
     setLoading(true);
     setError(null);
     try {
-      const r = await aiSuggest(tasks, projects);
+      const r = await aiSuggest(tasks, projects, weekAgenda.length > 0 ? weekAgenda : undefined);
       setResult(r);
       setDismissed(new Set());
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ date: todayISO(), result: r }));
@@ -187,6 +219,9 @@ export default function SuggestionsPanel() {
                   </span>
                   <div className="min-w-0 flex-1">
                     <div className="text-[13px] leading-snug text-[var(--text)]">{s.title}</div>
+                    {s.detail && (
+                      <div className="mt-0.5 text-[11.5px] italic text-[var(--text-muted)]">{s.detail}</div>
+                    )}
                     {tasksInSug.length > 0 && (
                       <div className="mt-1.5 flex flex-wrap gap-1">
                         {tasksInSug.slice(0, 5).map((t) => (

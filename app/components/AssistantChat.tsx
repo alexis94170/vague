@@ -2,9 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useStore } from "../store";
-import { aiChat, ChatEvent } from "../lib/ai-client";
+import { useGoogle } from "../google";
+import { aiChat, aiBreakdown, ChatEvent } from "../lib/ai-client";
+import { autoSchedule, clampToNow, findFreeSlots, formatHourMinute, workDayWindow } from "../lib/calendar-utils";
+import { addDays, todayISO } from "../lib/dates";
+import { eventEnd, eventStart, isAllDay, createCalendarEvent } from "../lib/google-client";
 import { haptic } from "../lib/haptics";
-import { Priority, Task } from "../lib/types";
+import { Priority, Subtask, Task } from "../lib/types";
+import { newId } from "../lib/storage";
 import Icon from "./Icon";
 import VoiceButton from "./VoiceButton";
 
@@ -68,6 +73,21 @@ function friendlyActionSummary(name: string, input: Record<string, unknown>, loo
       const name = projectLookup(String(input.projectId ?? "")) ?? "projet";
       return `🗑 Projet « ${name} » supprimé`;
     }
+    case "auto_schedule": {
+      const ids = (input.taskIds as string[]) ?? [];
+      const date = String(input.date ?? "aujourd'hui");
+      return `🌊 ${ids.length} tâche${ids.length > 1 ? "s" : ""} planifiée${ids.length > 1 ? "s" : ""} pour ${date}`;
+    }
+    case "break_down_task": {
+      const id = String(input.taskId ?? "");
+      const title = lookup(id) ?? "tâche";
+      return `✦ Décomposition · « ${title} »`;
+    }
+    case "block_calendar": {
+      const id = String(input.taskId ?? "");
+      const title = lookup(id) ?? "tâche";
+      return `📅 Bloqué dans l'agenda · « ${title} »`;
+    }
   }
   return `Action : ${name}`;
 }
@@ -114,7 +134,9 @@ export default function AssistantChat({ open, onClose }: Props) {
     return projects.find((p) => p.id === id)?.name;
   }
 
-  function executeTool(name: string, input: Record<string, unknown>): boolean {
+  const google = useGoogle();
+
+  async function executeTool(name: string, input: Record<string, unknown>): Promise<boolean> {
     try {
       switch (name) {
         case "create_task": {
@@ -183,6 +205,79 @@ export default function AssistantChat({ open, onClose }: Props) {
           store.deleteProject(id);
           return true;
         }
+        case "auto_schedule": {
+          const ids = (input.taskIds as string[]) ?? [];
+          const date = String(input.date ?? todayISO());
+          if (ids.length === 0) return false;
+          const tasksToSchedule = ids
+            .map((id) => tasks.find((t) => t.id === id))
+            .filter((t): t is Task => !!t);
+          // Compute slots for that day
+          const dayEvents = google.eventsForDate(date);
+          const baseWin = workDayWindow(date);
+          const win = clampToNow(baseWin, date);
+          const slots = findFreeSlots(dayEvents, win.start, win.end, 15);
+          const { scheduled } = autoSchedule(tasksToSchedule, slots, 5);
+          store.patchTasks(ids, { dueDate: date });
+          for (const s of scheduled) {
+            const time = `${String(s.start.getHours()).padStart(2, "0")}:${String(s.start.getMinutes()).padStart(2, "0")}`;
+            store.patchTask(s.taskId, { dueTime: time });
+          }
+          return true;
+        }
+        case "break_down_task": {
+          const id = String(input.taskId ?? "");
+          const task = tasks.find((t) => t.id === id);
+          if (!task) return false;
+          // Run breakdown async, add subtasks when done
+          aiBreakdown({
+            title: task.title,
+            notes: task.notes,
+            projectName: projects.find((p) => p.id === task.projectId)?.name,
+            estimateMinutes: task.estimateMinutes,
+          })
+            .then((r) => {
+              const newSubs: Subtask[] = [...task.subtasks];
+              for (const section of r.sections) {
+                for (const step of section.steps) {
+                  newSubs.push({
+                    id: newId(),
+                    title: step.title,
+                    done: false,
+                    section: section.name || undefined,
+                  });
+                }
+              }
+              store.patchTask(id, {
+                subtasks: newSubs,
+                tags: Array.from(new Set([...task.tags, ...(r.tags ?? [])])),
+              });
+            })
+            .catch((e) => console.error("Inline breakdown failed:", e));
+          return true;
+        }
+        case "block_calendar": {
+          if (!google.isConnected) return false;
+          const id = String(input.taskId ?? "");
+          const task = tasks.find((t) => t.id === id);
+          if (!task) return false;
+          const dueDate = String(input.dueDate ?? task.dueDate ?? todayISO());
+          const dueTime = String(input.dueTime ?? task.dueTime ?? "09:00");
+          const duration = Number(input.estimateMinutes ?? task.estimateMinutes ?? 30);
+          // Update task with these values too
+          store.patchTask(id, { dueDate, dueTime, estimateMinutes: duration });
+          const startDate = new Date(`${dueDate}T${dueTime}:00`);
+          const endDate = new Date(startDate.getTime() + duration * 60_000);
+          createCalendarEvent({
+            summary: task.title,
+            description: task.notes,
+            start: startDate.toISOString(),
+            end: endDate.toISOString(),
+          })
+            .then(() => google.refresh())
+            .catch((e) => console.error("block_calendar failed:", e));
+          return true;
+        }
       }
     } catch (e) {
       console.error("tool exec failed:", e);
@@ -205,6 +300,33 @@ export default function AssistantChat({ open, onClose }: Props) {
     abortRef.current = controller;
 
     try {
+      // Build calendar context
+      const today = todayISO();
+      const eventsCtx = google.events.slice(0, 60).map((e) => {
+        const start = eventStart(e);
+        const end = eventEnd(e);
+        const fmt = (d: Date) => `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+        const y = start.getFullYear();
+        const m = String(start.getMonth() + 1).padStart(2, "0");
+        const d = String(start.getDate()).padStart(2, "0");
+        return {
+          date: `${y}-${m}-${d}`,
+          start: isAllDay(e) ? "all-day" : fmt(start),
+          end: isAllDay(e) ? "all-day" : fmt(end),
+          summary: e.summary || "(Sans titre)",
+          calendar: e.__calendarName ?? undefined,
+        };
+      });
+      const todayEvents = google.eventsForDate(today);
+      const baseWin = workDayWindow(today);
+      const win = clampToNow(baseWin, today);
+      const todaySlots = findFreeSlots(todayEvents, win.start, win.end, 15).map((s) => ({
+        date: today,
+        start: formatHourMinute(s.start),
+        end: formatHourMinute(s.end),
+        minutes: s.minutes,
+      }));
+
       await aiChat(
         [...messages, userMsg],
         tasks,
@@ -217,22 +339,30 @@ export default function AssistantChat({ open, onClose }: Props) {
             if (event.type === "text") {
               next[next.length - 1] = { ...last, content: last.content + event.text };
             } else if (event.type === "tool") {
-              const ok = executeTool(event.name, event.input);
-              if (ok) {
-                haptic("success");
-                const summary = friendlyActionSummary(event.name, event.input, titleLookup, projectNameLookup);
-                next[next.length - 1] = {
-                  ...last,
-                  actions: [...(last.actions ?? []), { name: event.name, summary }],
-                };
-              }
+              executeTool(event.name, event.input).then((ok) => {
+                if (ok) {
+                  haptic("success");
+                  const summary = friendlyActionSummary(event.name, event.input, titleLookup, projectNameLookup);
+                  setMessages((prev2) => {
+                    const next2 = [...prev2];
+                    const last2 = next2[next2.length - 1];
+                    if (last2.role !== "assistant") return prev2;
+                    next2[next2.length - 1] = {
+                      ...last2,
+                      actions: [...(last2.actions ?? []), { name: event.name, summary }],
+                    };
+                    return next2;
+                  });
+                }
+              });
             } else if (event.type === "error") {
               next[next.length - 1] = { ...last, content: last.content + `\n⚠ ${event.error}` };
             }
             return next;
           });
         },
-        controller.signal
+        controller.signal,
+        { events: eventsCtx, freeSlotsToday: todaySlots, hasGoogleConnected: google.isConnected }
       );
       haptic("light");
     } catch (e) {

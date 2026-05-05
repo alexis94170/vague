@@ -7,6 +7,8 @@ import { useToast } from "../toast";
 import { Priority, PRIORITY_LABEL, RecurrenceUnit, Subtask, Task } from "../lib/types";
 import { newId } from "../lib/storage";
 import { createCalendarEvent } from "../lib/google-client";
+import { aiBreakdown, BreakdownResult } from "../lib/ai-client";
+import { addDays as addDaysISO, todayISO } from "../lib/dates";
 import { findEventConflicts, findFreeSlots, formatHourMinute, formatDuration, workDayWindow, clampToNow } from "../lib/calendar-utils";
 import { usePomodoro } from "../pomodoro";
 import Icon from "./Icon";
@@ -28,6 +30,9 @@ export default function TaskDrawer({ taskId, onClose, onFocus }: Props) {
   const [draft, setDraft] = useState<Task | null>(task);
   const [creatingEvent, setCreatingEvent] = useState(false);
   const [showCalendarPicker, setShowCalendarPicker] = useState(false);
+  const [breakdownLoading, setBreakdownLoading] = useState(false);
+  const [breakdown, setBreakdown] = useState<BreakdownResult | null>(null);
+  const [breakdownError, setBreakdownError] = useState<string | null>(null);
 
   useEffect(() => {
     setDraft(task);
@@ -81,6 +86,49 @@ export default function TaskDrawer({ taskId, onClose, onFocus }: Props) {
       .map((t) => t.trim().replace(/^[@#]/, ""))
       .filter(Boolean);
     save({ tags });
+  }
+
+  async function runBreakdown() {
+    if (!draft) return;
+    setBreakdownLoading(true);
+    setBreakdownError(null);
+    setBreakdown(null);
+    try {
+      const projectName = projects.find((p) => p.id === draft.projectId)?.name;
+      const r = await aiBreakdown({
+        title: draft.title,
+        notes: draft.notes,
+        projectName,
+        estimateMinutes: draft.estimateMinutes,
+      });
+      setBreakdown(r);
+    } catch (e) {
+      setBreakdownError((e as Error).message);
+    } finally {
+      setBreakdownLoading(false);
+    }
+  }
+
+  function applyBreakdown(picked: { sectionIdx: number; stepIdx: number }[]) {
+    if (!draft || !breakdown) return;
+    const today = todayISO();
+    const newSubs: Subtask[] = [...draft.subtasks];
+    for (const { sectionIdx, stepIdx } of picked) {
+      const section = breakdown.sections[sectionIdx];
+      const step = section?.steps[stepIdx];
+      if (!step) continue;
+      newSubs.push({
+        id: newId(),
+        title: step.title,
+        done: false,
+        section: section.name || undefined,
+      });
+    }
+    // Also extend the parent task's tags if needed
+    const newTags = Array.from(new Set([...draft.tags, ...(breakdown.tags ?? [])]));
+    save({ subtasks: newSubs, tags: newTags });
+    setBreakdown(null);
+    toast.show({ message: `${picked.length} sous-tâche(s) ajoutée(s) 🌊` });
   }
 
   async function blockInCalendar(opts?: { accountId?: string; calendarId?: string }) {
@@ -254,7 +302,26 @@ export default function TaskDrawer({ taskId, onClose, onFocus }: Props) {
                 <Icon name="clock" size={12} />
                 Focus {draft.estimateMinutes && draft.estimateMinutes <= 60 ? `(${draft.estimateMinutes} min)` : "(25 min)"}
               </button>
+              <button
+                onClick={runBreakdown}
+                disabled={breakdownLoading}
+                className="flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--bg)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-muted)] transition hover:border-[var(--accent)]/40 hover:text-[var(--accent)] active:scale-95 disabled:opacity-50"
+                title="Décomposer cette tâche en sous-tâches"
+              >
+                <Icon name="sparkles" size={12} />
+                {breakdownLoading ? "Réflexion…" : "Étoffer avec l'IA"}
+              </button>
             </div>
+          )}
+
+          {/* Breakdown result */}
+          {(breakdown || breakdownError) && (
+            <BreakdownPanel
+              result={breakdown}
+              error={breakdownError}
+              onApply={applyBreakdown}
+              onClose={() => { setBreakdown(null); setBreakdownError(null); }}
+            />
           )}
 
           {/* Conflict + free slot panel */}
@@ -424,6 +491,146 @@ export default function TaskDrawer({ taskId, onClose, onFocus }: Props) {
 
 const fieldInput =
   "w-full rounded-md border border-[var(--border)] bg-[var(--bg)] px-2.5 py-1.5 text-[13px] outline-none transition hover:border-[var(--border-strong)] focus:border-[var(--accent)]/50";
+
+function BreakdownPanel({
+  result,
+  error,
+  onApply,
+  onClose,
+}: {
+  result: BreakdownResult | null;
+  error: string | null;
+  onApply: (picked: Array<{ sectionIdx: number; stepIdx: number }>) => void;
+  onClose: () => void;
+}) {
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  // Pre-select all on result load
+  useEffect(() => {
+    if (result) {
+      const all = new Set<string>();
+      result.sections.forEach((s, si) =>
+        s.steps.forEach((_, sti) => all.add(`${si}:${sti}`))
+      );
+      setSelected(all);
+    }
+  }, [result]);
+
+  if (error) {
+    return (
+      <div className="ml-8 mt-4 rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-[12.5px] text-rose-700 dark:border-rose-900/50 dark:bg-rose-900/20 dark:text-rose-300">
+        ⚠ {error}
+        <button onClick={onClose} className="ml-2 underline">Fermer</button>
+      </div>
+    );
+  }
+  if (!result) return null;
+
+  function toggle(si: number, sti: number) {
+    const key = `${si}:${sti}`;
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  }
+
+  function applyAll() {
+    const picked: Array<{ sectionIdx: number; stepIdx: number }> = [];
+    selected.forEach((k) => {
+      const [si, sti] = k.split(":").map(Number);
+      picked.push({ sectionIdx: si, stepIdx: sti });
+    });
+    // Sort by section then step idx
+    picked.sort((a, b) => a.sectionIdx - b.sectionIdx || a.stepIdx - b.stepIdx);
+    onApply(picked);
+  }
+
+  return (
+    <div className="ml-8 mt-4 rounded-lg border border-[var(--accent)]/30 bg-[var(--accent-soft)] p-3">
+      <div className="mb-2 flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--accent)]">
+            Décomposition IA
+          </div>
+          <div className="mt-1 text-[12.5px] leading-relaxed text-[var(--text)]">
+            {result.summary}
+          </div>
+        </div>
+        <button
+          onClick={onClose}
+          className="shrink-0 rounded p-1 text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"
+          title="Annuler"
+        >
+          <Icon name="x" size={14} />
+        </button>
+      </div>
+
+      <div className="mt-3 space-y-3 max-h-96 overflow-y-auto rounded-md border border-[var(--border)] bg-[var(--bg-elev)] p-2">
+        {result.sections.map((section, si) => (
+          <div key={si}>
+            {section.name && (
+              <div className="mb-1 px-1 text-[10.5px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+                {section.name}
+              </div>
+            )}
+            <div className="space-y-px">
+              {section.steps.map((step, sti) => {
+                const key = `${si}:${sti}`;
+                const isOn = selected.has(key);
+                return (
+                  <label
+                    key={sti}
+                    className={`flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 hover:bg-[var(--bg-hover)] ${
+                      isOn ? "" : "opacity-50"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isOn}
+                      onChange={() => toggle(si, sti)}
+                      className="h-4 w-4 cursor-pointer accent-[var(--accent)]"
+                    />
+                    <span className="min-w-0 flex-1 text-[13px] text-[var(--text)]">{step.title}</span>
+                    <span className="shrink-0 text-[10.5px] tabular-nums text-[var(--text-subtle)]">
+                      {step.estimateMinutes}min
+                      {step.daysOffset >= 0 && (
+                        <span className="ml-1.5">
+                          {step.daysOffset === 0 ? "Auj." : `J+${step.daysOffset}`}
+                        </span>
+                      )}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-3 flex items-center justify-between gap-2">
+        <span className="text-[11px] text-[var(--text-muted)]">
+          {selected.size} étape{selected.size > 1 ? "s" : ""} sélectionnée{selected.size > 1 ? "s" : ""}
+        </span>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onClose}
+            className="rounded-md px-3 py-1 text-[11.5px] text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"
+          >
+            Annuler
+          </button>
+          <button
+            onClick={applyAll}
+            disabled={selected.size === 0}
+            className="rounded-md bg-[var(--accent)] px-3 py-1 text-[11.5px] font-medium text-[var(--accent-fg)] disabled:opacity-40"
+          >
+            Ajouter ({selected.size})
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function ConflictPanel({ draft, onPickTime }: { draft: Task; onPickTime: (time: string) => void }) {
   const { eventsForDate, isConnected } = useGoogle();

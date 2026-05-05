@@ -13,10 +13,67 @@ export type ClassifyResult = {
 };
 
 export type PlanResult = {
-  selectedIds: string[];
+  selectedIds: string[]; // legacy
+  schedule: Array<{
+    taskId: string;
+    suggestedTime: string; // HH:MM
+    durationMinutes: number;
+    reasoning: string;
+  }>;
   reasoning: string;
   warnings: string[];
 };
+
+export type EventBrief = {
+  summary: string;
+  start: string; // HH:MM
+  end: string;
+  calendar?: string;
+};
+
+export type FreeSlotBrief = {
+  start: string;
+  end: string;
+  minutes: number;
+};
+
+export type BreakdownStep = {
+  title: string;
+  estimateMinutes: number;
+  daysOffset: number;
+};
+
+export type BreakdownSection = {
+  name: string;
+  steps: BreakdownStep[];
+};
+
+export type BreakdownResult = {
+  summary: string;
+  sections: BreakdownSection[];
+  tags: string[];
+};
+
+export async function aiBreakdown(opts: {
+  title: string;
+  notes?: string;
+  projectName?: string;
+  estimateMinutes?: number;
+  context?: string;
+}): Promise<BreakdownResult> {
+  const res = await fetch("/api/ai/breakdown", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(opts),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Erreur inconnue" }));
+    throw new Error(err.error ?? `HTTP ${res.status}`);
+  }
+  const data = await res.json();
+  if (data?.usage?.cost) recordAiCost("breakdown", data.usage.cost);
+  return data;
+}
 
 export async function aiClassify(title: string, projects: Project[], existingTags: string[]): Promise<ClassifyResult> {
   const res = await fetch("/api/ai/classify", {
@@ -37,11 +94,21 @@ export async function aiClassify(title: string, projects: Project[], existingTag
   return data;
 }
 
-export async function aiPlan(tasks: Task[], projects: Project[], opts?: { availableMinutes?: number; focus?: string }): Promise<PlanResult> {
+export async function aiPlan(
+  tasks: Task[],
+  projects: Project[],
+  opts?: {
+    availableMinutes?: number;
+    focus?: string;
+    events?: EventBrief[];
+    freeSlots?: FreeSlotBrief[];
+    workWindow?: { start: string; end: string };
+  }
+): Promise<PlanResult> {
   const projectsById = new Map(projects.map((p) => [p.id, p.name]));
   const today = todayISO();
   const candidates = tasks
-    .filter((t) => !t.done && !t.waiting)
+    .filter((t) => !t.done && !t.waiting && !t.deletedAt)
     .map((t) => ({
       id: t.id,
       title: t.title,
@@ -62,6 +129,9 @@ export async function aiPlan(tasks: Task[], projects: Project[], opts?: { availa
       today,
       availableMinutes: opts?.availableMinutes,
       focus: opts?.focus,
+      events: opts?.events,
+      freeSlots: opts?.freeSlots,
+      workWindow: opts?.workWindow,
     }),
   });
   if (!res.ok) {
@@ -74,8 +144,9 @@ export async function aiPlan(tasks: Task[], projects: Project[], opts?: { availa
 }
 
 export type Suggestion = {
-  kind: "focus" | "reschedule" | "followup" | "cleanup" | "waiting" | "insight";
+  kind: "focus" | "reschedule" | "followup" | "cleanup" | "waiting" | "insight" | "workload" | "snoozed";
   title: string;
+  detail?: string;
   taskIds: string[];
   action: "mark_today" | "snooze_tomorrow" | "snooze_week" | "mark_waiting" | "delete" | "none";
 };
@@ -85,10 +156,21 @@ export type SuggestResult = {
   suggestions: Suggestion[];
 };
 
-export async function aiSuggest(tasks: Task[], projects: Project[]): Promise<SuggestResult> {
+export type WeekAgendaDay = {
+  date: string;
+  events: number;
+  totalMinutes: number;
+  freeMinutes: number;
+};
+
+export async function aiSuggest(
+  tasks: Task[],
+  projects: Project[],
+  weekAgenda?: WeekAgendaDay[]
+): Promise<SuggestResult> {
   const projectsById = new Map(projects.map((p) => [p.id, p.name]));
   const candidates = tasks
-    .filter((t) => !t.done)
+    .filter((t) => !t.done && !t.deletedAt)
     .map((t) => ({
       id: t.id,
       title: t.title,
@@ -99,11 +181,13 @@ export async function aiSuggest(tasks: Task[], projects: Project[]): Promise<Sug
       waitingFor: t.waitingFor,
       tags: t.tags,
       createdAt: t.createdAt,
+      estimateMinutes: t.estimateMinutes,
+      snoozeCount: t.snoozeCount,
     }));
   const res = await fetch("/api/ai/suggest", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ tasks: candidates, today: todayISO() }),
+    body: JSON.stringify({ tasks: candidates, today: todayISO(), weekAgenda }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: "Erreur" }));
@@ -120,12 +204,19 @@ export type ChatEvent =
   | { type: "done"; cost?: number }
   | { type: "error"; error: string };
 
+export type ChatCalendarContext = {
+  events?: Array<{ date: string; start: string; end: string; summary: string; calendar?: string }>;
+  freeSlotsToday?: Array<{ date: string; start: string; end: string; minutes: number }>;
+  hasGoogleConnected?: boolean;
+};
+
 export async function aiChat(
   messages: Array<{ role: "user" | "assistant"; content: string }>,
   tasks: Task[],
   projects: Project[],
   onEvent: (event: ChatEvent) => void,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  ctx?: ChatCalendarContext
 ): Promise<void> {
   const projectsById = new Map(projects.map((p) => [p.id, p.name]));
   const taskBrief = tasks
@@ -152,6 +243,9 @@ export async function aiChat(
       tasks: taskBrief,
       projects: projects.filter((p) => p.id !== "inbox").map((p) => ({ id: p.id, name: p.name })),
       today: todayISO(),
+      events: ctx?.events,
+      freeSlotsToday: ctx?.freeSlotsToday,
+      hasGoogleConnected: ctx?.hasGoogleConnected,
     }),
     signal,
   });

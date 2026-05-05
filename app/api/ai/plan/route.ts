@@ -14,35 +14,71 @@ type TaskBrief = {
   tags?: string[];
 };
 
+type EventBrief = {
+  summary: string;
+  start: string; // HH:MM
+  end: string; // HH:MM
+  calendar?: string;
+};
+
+type FreeSlotBrief = {
+  start: string; // HH:MM
+  end: string;
+  minutes: number;
+};
+
 type PlanInput = {
   tasks: TaskBrief[];
   today: string;
   availableMinutes?: number;
   focus?: string;
+  // NEW: calendar context
+  events?: EventBrief[];
+  freeSlots?: FreeSlotBrief[];
+  workWindow?: { start: string; end: string };
 };
 
 const PLAN_TOOL = {
   name: "propose_daily_plan",
-  description: "Sélectionne 5 à 7 tâches à traiter aujourd'hui parmi la liste, en équilibrant urgence, projets, et estimations de temps.",
+  description: "Sélectionne 5-7 tâches pour aujourd'hui ET propose un horaire précis pour chacune dans les créneaux libres de l'agenda.",
   input_schema: {
     type: "object" as const,
     properties: {
-      selectedIds: {
+      schedule: {
         type: "array",
-        items: { type: "string" },
-        description: "IDs des tâches choisies pour aujourd'hui (5 à 7, sauf si la liste est plus courte).",
+        description: "Liste ordonnée des tâches à faire aujourd'hui avec horaires proposés. 5-7 tâches sauf si la liste candidate est plus courte.",
+        items: {
+          type: "object",
+          properties: {
+            taskId: { type: "string", description: "ID exact de la tâche" },
+            suggestedTime: {
+              type: "string",
+              description: "Heure de début proposée au format HH:MM. Doit tomber dans un créneau libre. Si aucun créneau ne convient, mettre une chaîne vide."
+            },
+            durationMinutes: {
+              type: "number",
+              description: "Durée prévue en minutes (utilise estimateMinutes si fourni, sinon estime raisonnablement entre 15 et 90 min)"
+            },
+            reasoning: {
+              type: "string",
+              description: "Raison brève (1 phrase max, ~12 mots) du placement de CETTE tâche à CETTE heure : énergie, contexte, urgence, ordre logique."
+            },
+          },
+          required: ["taskId", "suggestedTime", "durationMinutes", "reasoning"],
+          additionalProperties: false,
+        },
       },
       reasoning: {
         type: "string",
-        description: "Explication courte en français (2-4 phrases) sur pourquoi cette sélection : quelles priorités, quel équilibre, quelles tâches en retard traitées.",
+        description: "Vue d'ensemble de la stratégie du jour (3-4 phrases) : quelles priorités traitées, quelle logique de placement, équilibre entre projets, conseils.",
       },
       warnings: {
         type: "array",
         items: { type: "string" },
-        description: "Avertissements éventuels (ex: 'Tu as 4 tâches urgentes en retard, considère en reporter certaines'). Vide si rien à signaler.",
+        description: "Avertissements (charge excessive, conflits, urgences à reporter…). Tableau vide si rien à signaler.",
       },
     },
-    required: ["selectedIds", "reasoning", "warnings"],
+    required: ["schedule", "reasoning", "warnings"],
     additionalProperties: false,
   },
 };
@@ -70,17 +106,38 @@ export async function POST(req: Request) {
     return Response.json({ error: "tasks requis" }, { status: 400 });
   }
 
+  const hasCalendar = (body.events && body.events.length > 0) || (body.freeSlots && body.freeSlots.length > 0);
+
   const systemBlocks = [
     {
       type: "text" as const,
-      text: `Tu es un coach de productivité qui aide à choisir les 5-7 tâches les plus importantes pour aujourd'hui.
+      text: `Tu es un coach de productivité expert qui planifie la journée d'un entrepreneur. Tu n'agis que via l'outil propose_daily_plan.
 
-Principes :
-- Priorise les tâches en retard urgentes/hautes > dues aujourd'hui > priorités hautes non-datées.
-- Équilibre entre projets (n'enferme pas la journée dans un seul projet).
-- Respecte le budget de temps si donné.
-- Ne sélectionne PAS de tâches avec priorité "none" sauf si la liste urgent/high est déjà pleine.
-- Appelle propose_daily_plan en sortie, toujours.`,
+PRIORITÉS (dans l'ordre) :
+1. Tâches en RETARD urgentes/hautes
+2. Tâches dues aujourd'hui
+3. Urgentes/hautes non-datées
+4. Tâches qui débloquent d'autres choses
+
+PLACEMENT INTELLIGENT (essentiel quand un agenda est fourni) :
+- Tâches cognitives lourdes (compta, stratégie, écriture) → matin, début de créneau
+- Tâches admin/répétitives → après-midi
+- Appels/relances → milieu de journée
+- Évite ABSOLUMENT de placer une tâche pendant un événement existant — utilise UNIQUEMENT les créneaux libres
+- Laisse 5-10 min de buffer entre les tâches
+- Respecte les estimateMinutes — si une tâche est 90min, elle doit tenir dans un créneau de >=90min
+- Si pas assez de créneaux, choisis moins de tâches (3-4 plutôt que 7) et explique pourquoi
+
+ÉQUILIBRE :
+- Ne mets pas tout du même projet
+- Mix tâches courtes et longues si possible
+- Une tâche urgente ne doit pas attendre l'après-midi
+
+WARNINGS À ÉMETTRE :
+- Plus de 4h de tâches estimées → surcharge
+- Plus de 3 urgences en retard → reporter certaines
+- Tâche placée hors créneau libre faute d'alternative → signaler
+- Tâche sans heure trouvée → préciser pourquoi`,
       cache_control: { type: "ephemeral" as const },
     },
   ];
@@ -98,17 +155,32 @@ Principes :
     })
     .join("\n");
 
+  const eventLines = (body.events ?? [])
+    .map((e) => `- ${e.start}-${e.end} : ${e.summary}${e.calendar ? ` [${e.calendar}]` : ""}`)
+    .join("\n");
+
+  const slotLines = (body.freeSlots ?? [])
+    .map((s) => `- ${s.start} → ${s.end} (${s.minutes} min)`)
+    .join("\n");
+
   const userMessage = `Aujourd'hui : ${body.today}
-${body.availableMinutes ? `Temps dispo estimé : ${body.availableMinutes} min\n` : ""}${body.focus ? `Focus particulier : ${body.focus}\n` : ""}
-Tâches candidates (${body.tasks.length}) :
+${body.workWindow ? `Fenêtre de travail : ${body.workWindow.start} - ${body.workWindow.end}\n` : ""}${body.availableMinutes ? `Temps dispo estimé : ${body.availableMinutes} min\n` : ""}${body.focus ? `Focus particulier : ${body.focus}\n` : ""}
+${hasCalendar ? `=== AGENDA D'AUJOURD'HUI ===
+${eventLines || "(aucun événement)"}
+
+=== CRÉNEAUX LIBRES ===
+${slotLines || "(aucun créneau libre — agenda plein)"}
+
+` : `(Pas d'agenda Google connecté — propose des horaires entre 8h et 19h sans contrainte d'événements existants.)\n\n`}
+=== TÂCHES CANDIDATES (${body.tasks.length}) ===
 ${taskLines}
 
-Propose 5-7 tâches à traiter aujourd'hui.`;
+Propose ton plan via propose_daily_plan.`;
 
   try {
     const response = await anthropic().messages.create({
       model: CHAT_MODEL,
-      max_tokens: 2048,
+      max_tokens: 4096,
       system: systemBlocks,
       tools: [PLAN_TOOL],
       tool_choice: { type: "tool", name: "propose_daily_plan" },
@@ -120,13 +192,22 @@ Propose 5-7 tâches à traiter aujourd'hui.`;
       return Response.json({ error: "Réponse IA invalide" }, { status: 502 });
     }
     const out = toolUse.input as {
-      selectedIds: string[];
+      schedule: Array<{
+        taskId: string;
+        suggestedTime: string;
+        durationMinutes: number;
+        reasoning: string;
+      }>;
       reasoning: string;
       warnings: string[];
     };
     // Filter to only valid IDs
     const validIds = new Set(body.tasks.map((t) => t.id));
-    out.selectedIds = out.selectedIds.filter((id) => validIds.has(id));
+    out.schedule = out.schedule.filter((s) => validIds.has(s.taskId));
+
+    // For backwards compatibility with old client, also return selectedIds
+    const selectedIds = out.schedule.map((s) => s.taskId);
+
     const usage = {
       input: response.usage.input_tokens,
       output: response.usage.output_tokens,
@@ -135,7 +216,13 @@ Propose 5-7 tâches à traiter aujourd'hui.`;
     };
     const cost = estimateCost(CHAT_MODEL, usage);
     recordSpend(req.headers, cost);
-    return Response.json({ ...out, usage: { ...usage, cost } });
+    return Response.json({
+      schedule: out.schedule,
+      selectedIds, // legacy
+      reasoning: out.reasoning,
+      warnings: out.warnings,
+      usage: { ...usage, cost },
+    });
   } catch (err) {
     return handleAnthropicError(err);
   }
