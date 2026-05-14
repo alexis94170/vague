@@ -1,5 +1,5 @@
 // Vague service worker — shell caching + network-first for API/data
-const SHELL_CACHE = "vague-shell-v8";
+const SHELL_CACHE = "vague-shell-v9";
 const SHELL_ASSETS = [
   "/",
   "/manifest.webmanifest",

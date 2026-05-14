@@ -1,4 +1,4 @@
-import { anthropic, CHAT_MODEL, handleAnthropicError, hasApiKey } from "../../../lib/ai-shared";
+import { anthropic, REASONING_MODEL, handleAnthropicError, hasApiKey, THINKING_BUDGET } from "../../../lib/ai-shared";
 import { checkDailyBudget, checkRateLimit, estimateCost, recordSpend } from "../../../lib/ai-ratelimit";
 
 export const runtime = "nodejs";
@@ -335,10 +335,15 @@ ${slotLines || "(agenda plein ou aucun créneau ≥15min)"}` : "Google Calendar 
       async start(controller) {
         try {
           const response = await anthropic().messages.create({
-            model: CHAT_MODEL,
-            max_tokens: 2048,
+            model: REASONING_MODEL,
+            max_tokens: 8192,
             system: systemBlocks,
             tools: TOOLS,
+            // Extended thinking — Claude réfléchit en interne avant de répondre
+            thinking: {
+              type: "enabled",
+              budget_tokens: THINKING_BUDGET,
+            },
             messages: body.messages.map((m) => ({ role: m.role, content: m.content })),
           });
 
@@ -352,9 +357,10 @@ ${slotLines || "(agenda plein ou aucun créneau ≥15min)"}` : "Google Calendar 
                 )
               );
             }
+            // thinking blocks: ignored (not surfaced to user, but Claude has used them to reason)
           }
 
-          const cost = estimateCost(CHAT_MODEL, {
+          const cost = estimateCost(REASONING_MODEL, {
             input: response.usage.input_tokens,
             output: response.usage.output_tokens,
             cacheRead: response.usage.cache_read_input_tokens ?? 0,

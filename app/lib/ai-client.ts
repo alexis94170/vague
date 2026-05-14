@@ -226,9 +226,19 @@ export async function aiChat(
   ctx?: ChatCalendarContext
 ): Promise<void> {
   const projectsById = new Map(projects.map((p) => [p.id, p.name]));
+  // Prioritize: incomplete first, then completed; up to 500 (Opus has 1M context anyway)
   const taskBrief = tasks
     .filter((t) => !t.deletedAt)
-    .slice(0, 300)
+    .sort((a, b) => {
+      // Active first (not done, not waiting)
+      const aActive = !a.done && !a.waiting ? 0 : 1;
+      const bActive = !b.done && !b.waiting ? 0 : 1;
+      if (aActive !== bActive) return aActive - bActive;
+      // Within same group: prio order
+      const pOrder: Record<string, number> = { urgent: 0, high: 1, medium: 2, low: 3, none: 4 };
+      return (pOrder[a.priority] ?? 4) - (pOrder[b.priority] ?? 4);
+    })
+    .slice(0, 500)
     .map((t) => ({
       id: t.id,
       title: t.title,

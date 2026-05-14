@@ -452,11 +452,14 @@ export default function AssistantChat({ open, onClose }: Props) {
                       </div>
                     )}
                     {!m.content && loading && i === messages.length - 1 && (!m.actions || m.actions.length === 0) && (
-                      <div className="rounded-2xl bg-[var(--bg)] px-4 py-2.5 text-[14px]">
-                        <span className="inline-flex items-center gap-1">
-                          <span className="h-2 w-2 animate-pulse rounded-full bg-current opacity-50" />
-                          <span className="h-2 w-2 animate-pulse rounded-full bg-current opacity-50" style={{ animationDelay: "150ms" }} />
-                          <span className="h-2 w-2 animate-pulse rounded-full bg-current opacity-50" style={{ animationDelay: "300ms" }} />
+                      <div className="rounded-2xl bg-[var(--bg)] px-4 py-2.5 text-[12.5px] text-[var(--text-muted)]">
+                        <span className="inline-flex items-center gap-2">
+                          <span className="inline-flex items-center gap-1">
+                            <span className="h-2 w-2 animate-pulse rounded-full bg-current opacity-50" />
+                            <span className="h-2 w-2 animate-pulse rounded-full bg-current opacity-50" style={{ animationDelay: "150ms" }} />
+                            <span className="h-2 w-2 animate-pulse rounded-full bg-current opacity-50" style={{ animationDelay: "300ms" }} />
+                          </span>
+                          <span className="italic">Claude réfléchit en profondeur…</span>
                         </span>
                       </div>
                     )}
