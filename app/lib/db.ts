@@ -94,7 +94,7 @@ function taskToDb(t: Task, userId: string) {
     subtasks: t.subtasks ?? [],
     recurrence: t.recurrence ?? null,
     snoozed_until: t.snoozedUntil || null,
-    snooze_count: t.snoozeCount ?? 0,
+    // snooze_count is conditional — added by upsertTask wrapper if the column exists
     waiting: t.waiting ?? false,
     waiting_for: t.waitingFor || null,
     deleted_at: t.deletedAt || null,
@@ -263,17 +263,53 @@ export async function deleteProjectDb(id: string) {
   if (error) throw error;
 }
 
+// Track whether the snooze_count column exists. Set to false on first
+// "column not found" error so subsequent writes skip it silently.
+let hasSnoozeCountColumn = true;
+
+function isMissingSnoozeCountError(err: unknown): boolean {
+  const msg = (err as { message?: string })?.message ?? String(err);
+  return /snooze_count/i.test(msg);
+}
+
+function taskToDbWithOptionalSnooze(t: Task, userId: string) {
+  const base = taskToDb(t, userId);
+  if (hasSnoozeCountColumn && typeof t.snoozeCount === "number") {
+    return { ...base, snooze_count: t.snoozeCount };
+  }
+  return base;
+}
+
 export async function upsertTask(t: Task, userId: string) {
-  const { error } = await supabase().from("tasks").upsert(taskToDb(t, userId));
-  if (error) throw error;
+  const { error } = await supabase().from("tasks").upsert(taskToDbWithOptionalSnooze(t, userId));
+  if (error) {
+    if (isMissingSnoozeCountError(error)) {
+      hasSnoozeCountColumn = false;
+      // Retry without the column
+      const { error: retryErr } = await supabase().from("tasks").upsert(taskToDb(t, userId));
+      if (retryErr) throw retryErr;
+      return;
+    }
+    throw error;
+  }
 }
 
 export async function upsertTasks(tasks: Task[], userId: string) {
   if (tasks.length === 0) return;
   const { error } = await supabase()
     .from("tasks")
-    .upsert(tasks.map((t) => taskToDb(t, userId)));
-  if (error) throw error;
+    .upsert(tasks.map((t) => taskToDbWithOptionalSnooze(t, userId)));
+  if (error) {
+    if (isMissingSnoozeCountError(error)) {
+      hasSnoozeCountColumn = false;
+      const { error: retryErr } = await supabase()
+        .from("tasks")
+        .upsert(tasks.map((t) => taskToDb(t, userId)));
+      if (retryErr) throw retryErr;
+      return;
+    }
+    throw error;
+  }
 }
 
 export async function deleteTaskDb(id: string) {
