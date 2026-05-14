@@ -1,4 +1,4 @@
-import { anthropic, CHAT_MODEL, handleAnthropicError, hasApiKey } from "../../../lib/ai-shared";
+import { anthropic, REASONING_MODEL, handleAnthropicError, hasApiKey } from "../../../lib/ai-shared";
 import { checkDailyBudget, checkRateLimit, estimateCost, recordSpend } from "../../../lib/ai-ratelimit";
 
 export const runtime = "nodejs";
@@ -32,10 +32,10 @@ type PlanInput = {
   today: string;
   availableMinutes?: number;
   focus?: string;
-  // NEW: calendar context
   events?: EventBrief[];
   freeSlots?: FreeSlotBrief[];
   workWindow?: { start: string; end: string };
+  profile?: string; // optional user profile block (built client-side)
 };
 
 const PLAN_TOOL = {
@@ -108,8 +108,17 @@ export async function POST(req: Request) {
 
   const hasCalendar = (body.events && body.events.length > 0) || (body.freeSlots && body.freeSlots.length > 0);
 
-  const systemBlocks = [
-    {
+  const systemBlocks: Array<{ type: "text"; text: string; cache_control?: { type: "ephemeral" } }> = [];
+
+  if (body.profile && body.profile.trim()) {
+    systemBlocks.push({
+      type: "text",
+      text: body.profile,
+      cache_control: { type: "ephemeral" },
+    });
+  }
+
+  systemBlocks.push({
       type: "text" as const,
       text: `Tu es un coach de productivité expert qui planifie la journée d'un entrepreneur. Tu n'agis que via l'outil propose_daily_plan.
 
@@ -137,10 +146,14 @@ WARNINGS À ÉMETTRE :
 - Plus de 4h de tâches estimées → surcharge
 - Plus de 3 urgences en retard → reporter certaines
 - Tâche placée hors créneau libre faute d'alternative → signaler
-- Tâche sans heure trouvée → préciser pourquoi`,
+- Tâche sans heure trouvée → préciser pourquoi
+
+ADAPTATION AU PROFIL UTILISATEUR :
+- Si tu vois des préférences ou habitudes spécifiques dans le profil ci-dessus, RESPECTE-LES strictement.
+- Si l'utilisateur dit "jamais de cognitif après 18h", n'en place pas le soir.
+- Si l'utilisateur a une routine ("mardi soir : compta"), respecte-la quand possible.`,
       cache_control: { type: "ephemeral" as const },
-    },
-  ];
+    });
 
   const taskLines = body.tasks
     .map((t) => {
@@ -179,8 +192,8 @@ Propose ton plan via propose_daily_plan.`;
 
   try {
     const response = await anthropic().messages.create({
-      model: CHAT_MODEL,
-      max_tokens: 4096,
+      model: REASONING_MODEL,
+      max_tokens: 6144,
       system: systemBlocks,
       tools: [PLAN_TOOL],
       tool_choice: { type: "tool", name: "propose_daily_plan" },
@@ -214,7 +227,7 @@ Propose ton plan via propose_daily_plan.`;
       cacheRead: response.usage.cache_read_input_tokens ?? 0,
       cacheWrite: response.usage.cache_creation_input_tokens ?? 0,
     };
-    const cost = estimateCost(CHAT_MODEL, usage);
+    const cost = estimateCost(REASONING_MODEL, usage);
     recordSpend(req.headers, cost);
     return Response.json({
       schedule: out.schedule,

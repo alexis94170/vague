@@ -6,6 +6,7 @@ import { notificationPermission, requestNotificationPermission } from "./Notific
 import { isPushSupported, isSubscribed, sendTestPush, subscribeToPush, unsubscribeFromPush } from "../lib/push-client";
 import { clearAiCost, getAiCostSummary } from "../lib/ai-cost-tracker";
 import { useGoogle } from "../google";
+import { loadProfile, saveProfile, UserProfile } from "../lib/user-profile";
 import Icon from "./Icon";
 
 type Props = {
@@ -22,6 +23,8 @@ export default function SettingsDialog({ open, onClose }: Props) {
   const [pushMsg, setPushMsg] = useState<string | null>(null);
   const [aiCost, setAiCost] = useState(() => getAiCostSummary());
   const [googleBusy, setGoogleBusy] = useState(false);
+  const [profile, setProfile] = useState<UserProfile>(() => loadProfile());
+  const [profileSaved, setProfileSaved] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -29,8 +32,17 @@ export default function SettingsDialog({ open, onClose }: Props) {
       isSubscribed().then(setPushOn);
       setAiCost(getAiCostSummary());
       google.refreshAccounts();
+      setProfile(loadProfile());
     }
   }, [open]);
+
+  function updateProfile<K extends keyof UserProfile>(key: K, value: UserProfile[K]) {
+    const next = { ...profile, [key]: value };
+    setProfile(next);
+    saveProfile(next);
+    setProfileSaved(true);
+    setTimeout(() => setProfileSaved(false), 1500);
+  }
 
   async function disconnectAccount(accountId: string, email: string) {
     if (!confirm(`Déconnecter le compte ${email} ?`)) return;
@@ -228,6 +240,89 @@ export default function SettingsDialog({ open, onClose }: Props) {
               {pushMsg && (
                 <div className="mt-2 text-[11px] text-[var(--accent)]">{pushMsg}</div>
               )}
+            </div>
+          </section>
+
+          {/* Profil IA */}
+          <section>
+            <div className="mb-2 flex items-center justify-between">
+              <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]">
+                Profil pour l'IA
+              </h3>
+              {profileSaved && (
+                <span className="text-[10.5px] text-[var(--accent)] anim-fade-in">✓ Enregistré</span>
+              )}
+            </div>
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--bg)] p-4 space-y-3">
+              <div className="text-[12px] leading-relaxed text-[var(--text-muted)]">
+                Ces infos sont envoyées à Claude à <strong className="text-[var(--text)]">chaque</strong> appel IA (plan, suggestions, assistant, décomposition).
+                Plus tu remplis, plus l'IA devient pertinente pour <em>toi</em>.
+              </div>
+
+              <label className="block">
+                <div className="mb-1 flex items-center gap-1.5 text-[11px] font-medium text-[var(--text-muted)]">
+                  <Icon name="sparkles" size={11} />
+                  Qui es-tu, que fais-tu ?
+                </div>
+                <textarea
+                  value={profile.bio}
+                  onChange={(e) => updateProfile("bio", e.target.value)}
+                  placeholder={"Ex: Restaurateur, propriétaire de l'Indiana Café à Paris 11.\nJe gère aussi 2 biens immobiliers et un projet pro perso.\n5 employés au resto. Ouvert 12h-23h, fermé le lundi."}
+                  rows={4}
+                  className="w-full resize-none rounded-md border border-[var(--border)] bg-[var(--bg-elev)] px-2.5 py-2 text-[12.5px] leading-relaxed outline-none transition focus:border-[var(--accent)]/50"
+                />
+              </label>
+
+              <div className="grid grid-cols-2 gap-2">
+                <label className="block">
+                  <div className="mb-1 text-[11px] font-medium text-[var(--text-muted)]">Début de journée</div>
+                  <input
+                    type="time"
+                    value={profile.workStart}
+                    onChange={(e) => updateProfile("workStart", e.target.value)}
+                    className="w-full rounded-md border border-[var(--border)] bg-[var(--bg-elev)] px-2.5 py-1.5 text-[13px] outline-none focus:border-[var(--accent)]/50"
+                  />
+                </label>
+                <label className="block">
+                  <div className="mb-1 text-[11px] font-medium text-[var(--text-muted)]">Fin de journée</div>
+                  <input
+                    type="time"
+                    value={profile.workEnd}
+                    onChange={(e) => updateProfile("workEnd", e.target.value)}
+                    className="w-full rounded-md border border-[var(--border)] bg-[var(--bg-elev)] px-2.5 py-1.5 text-[13px] outline-none focus:border-[var(--accent)]/50"
+                  />
+                </label>
+              </div>
+
+              <label className="block">
+                <div className="mb-1 text-[11px] font-medium text-[var(--text-muted)]">
+                  Préférences / contraintes
+                </div>
+                <textarea
+                  value={profile.preferences}
+                  onChange={(e) => updateProfile("preferences", e.target.value)}
+                  placeholder={"Ex: Pas de tâches cognitives lourdes après 18h.\nJamais d'admin le lundi.\nJe préfère traiter les appels en fin d'aprèm.\nLes urgences resto priment sur tout."}
+                  rows={3}
+                  className="w-full resize-none rounded-md border border-[var(--border)] bg-[var(--bg-elev)] px-2.5 py-2 text-[12.5px] leading-relaxed outline-none transition focus:border-[var(--accent)]/50"
+                />
+              </label>
+
+              <label className="block">
+                <div className="mb-1 text-[11px] font-medium text-[var(--text-muted)]">
+                  Routines / habitudes
+                </div>
+                <textarea
+                  value={profile.patterns}
+                  onChange={(e) => updateProfile("patterns", e.target.value)}
+                  placeholder={"Ex: Mardi soir = compta hebdo.\nJeudi matin = visite des biens immo.\nVendredi 15h = staff meeting Indiana Café."}
+                  rows={3}
+                  className="w-full resize-none rounded-md border border-[var(--border)] bg-[var(--bg-elev)] px-2.5 py-2 text-[12.5px] leading-relaxed outline-none transition focus:border-[var(--accent)]/50"
+                />
+              </label>
+
+              <div className="text-[10.5px] text-[var(--text-subtle)]">
+                Stocké uniquement dans ce navigateur (pas de sync entre appareils pour l'instant).
+              </div>
             </div>
           </section>
 

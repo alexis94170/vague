@@ -1,4 +1,4 @@
-import { anthropic, CHAT_MODEL, handleAnthropicError, hasApiKey } from "../../../lib/ai-shared";
+import { anthropic, REASONING_MODEL, handleAnthropicError, hasApiKey } from "../../../lib/ai-shared";
 import { checkDailyBudget, checkRateLimit, estimateCost, recordSpend } from "../../../lib/ai-ratelimit";
 
 export const runtime = "nodejs";
@@ -8,7 +8,8 @@ type BreakdownInput = {
   notes?: string;
   projectName?: string;
   estimateMinutes?: number;
-  context?: string; // additional context (other tasks in project, etc.)
+  context?: string;
+  profile?: string;
 };
 
 const BREAKDOWN_TOOL = {
@@ -93,8 +94,17 @@ export async function POST(req: Request) {
     return Response.json({ error: "title requis (>= 3 chars)" }, { status: 400 });
   }
 
-  const systemBlocks = [
-    {
+  const systemBlocks: Array<{ type: "text"; text: string; cache_control?: { type: "ephemeral" } }> = [];
+
+  if (body.profile && body.profile.trim()) {
+    systemBlocks.push({
+      type: "text",
+      text: body.profile,
+      cache_control: { type: "ephemeral" },
+    });
+  }
+
+  systemBlocks.push({
       type: "text" as const,
       text: `Tu es un coach exécutif qui aide à décomposer des tâches complexes en checklist actionnable.
 
@@ -110,10 +120,14 @@ PRINCIPES :
 EXEMPLE DE BONNE DÉCOMPOSITION pour "Préparer ouverture du resto" :
 Section "Administratif" : ["Vérifier statut SIRET", "Souscrire RC pro", "Déposer dossier hygiène DDPP"]
 Section "Cuisine" : ["Acheter robot Magimix", "Lister fournisseurs locaux", "Tester 3 recettes plat du jour"]
-Pas : ["Définir le concept", "Réfléchir au menu" (trop vague)]`,
+Pas : ["Définir le concept", "Réfléchir au menu" (trop vague)]
+
+ADAPTATION AU PROFIL :
+- Lis attentivement le profil utilisateur ci-dessus (s'il existe).
+- Utilise les noms de ses projets/lieux/personnes dans tes étapes ("Appeler X chez Indiana Café").
+- Respecte ses préférences et habitudes (ex: si "jamais le lundi", ne mets pas daysOffset qui tombe sur lundi).`,
       cache_control: { type: "ephemeral" as const },
-    },
-  ];
+    });
 
   const userMessage = `Tâche à décomposer : « ${body.title} »
 ${body.notes ? `\nNotes existantes :\n${body.notes}\n` : ""}${body.projectName ? `\nProjet : ${body.projectName}` : ""}${body.estimateMinutes ? `\nEstimation actuelle : ${body.estimateMinutes} min` : ""}${body.context ? `\n\nContexte :\n${body.context}` : ""}
@@ -122,8 +136,8 @@ Décompose-la en checklist actionnable.`;
 
   try {
     const response = await anthropic().messages.create({
-      model: CHAT_MODEL,
-      max_tokens: 4096,
+      model: REASONING_MODEL,
+      max_tokens: 6144,
       system: systemBlocks,
       tools: [BREAKDOWN_TOOL],
       tool_choice: { type: "tool", name: "break_down_task" },
@@ -148,7 +162,7 @@ Décompose-la en checklist actionnable.`;
       cacheRead: response.usage.cache_read_input_tokens ?? 0,
       cacheWrite: response.usage.cache_creation_input_tokens ?? 0,
     };
-    const cost = estimateCost(CHAT_MODEL, usage);
+    const cost = estimateCost(REASONING_MODEL, usage);
     recordSpend(req.headers, cost);
     return Response.json({ ...out, usage: { ...usage, cost } });
   } catch (err) {

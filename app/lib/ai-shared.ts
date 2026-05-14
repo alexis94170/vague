@@ -27,5 +27,13 @@ export function handleAnthropicError(err: unknown): Response {
   return Response.json({ error: "Erreur inconnue" }, { status: 500 });
 }
 
+// === Models ===
+// Haiku: fast, cheap — for quick classification of a single new task
 export const CLASSIFY_MODEL = "claude-haiku-4-5" as const;
+// Sonnet: balanced — for chat (needs responsiveness)
 export const CHAT_MODEL = "claude-sonnet-4-6" as const;
+// Opus: most capable — for deep reasoning tasks (plan, breakdown, suggest)
+export const REASONING_MODEL = "claude-opus-4-7" as const;
+
+// Extended thinking config for reasoning tasks
+export const THINKING_BUDGET = 4000; // tokens dedicated to internal reasoning before output

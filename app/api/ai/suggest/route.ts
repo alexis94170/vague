@@ -1,4 +1,4 @@
-import { anthropic, CHAT_MODEL, handleAnthropicError, hasApiKey } from "../../../lib/ai-shared";
+import { anthropic, REASONING_MODEL, handleAnthropicError, hasApiKey } from "../../../lib/ai-shared";
 import { checkDailyBudget, checkRateLimit, estimateCost, recordSpend } from "../../../lib/ai-ratelimit";
 
 export const runtime = "nodejs";
@@ -28,6 +28,7 @@ type SuggestInput = {
   tasks: TaskBrief[];
   today: string;
   weekAgenda?: EventDayBrief[];
+  profile?: string;
 };
 
 const SUGGEST_TOOL = {
@@ -101,8 +102,17 @@ export async function POST(req: Request) {
     return Response.json({ error: "tasks requis" }, { status: 400 });
   }
 
-  const systemBlocks = [
-    {
+  const systemBlocks: Array<{ type: "text"; text: string; cache_control?: { type: "ephemeral" } }> = [];
+
+  if (body.profile && body.profile.trim()) {
+    systemBlocks.push({
+      type: "text",
+      text: body.profile,
+      cache_control: { type: "ephemeral" },
+    });
+  }
+
+  systemBlocks.push({
       type: "text" as const,
       text: `Tu es un coach de productivité expert qui analyse la situation d'un entrepreneur et propose 3-6 actions ciblées et concrètes.
 
@@ -142,10 +152,13 @@ RÈGLES DE FORMULATION :
 - 6 suggestions MAX, 3-4 idéal.
 - Pas de blabla, va à l'essentiel.
 
+ADAPTATION AU PROFIL :
+- Si le profil utilisateur précise des habitudes, des contraintes ou un domaine d'activité, exploite-les pour des suggestions HYPER spécifiques.
+- Ex: si l'utilisateur dit "Indiana Café ouvre à 9h", suggère "Bloque ta matinée AVANT 9h pour la compta".
+
 Toujours appeler emit_suggestions.`,
       cache_control: { type: "ephemeral" as const },
-    },
-  ];
+    });
 
   const taskLines = body.tasks.slice(0, 200).map((t) => {
     const bits: string[] = [`[${t.id}]`, `« ${t.title} »`, `prio=${t.priority}`];
@@ -178,8 +191,8 @@ Analyse et propose des suggestions concrètes et personnalisées.`;
 
   try {
     const response = await anthropic().messages.create({
-      model: CHAT_MODEL,
-      max_tokens: 2048,
+      model: REASONING_MODEL,
+      max_tokens: 3072,
       system: systemBlocks,
       tools: [SUGGEST_TOOL],
       tool_choice: { type: "tool", name: "emit_suggestions" },
@@ -205,7 +218,7 @@ Analyse et propose des suggestions concrètes et personnalisées.`;
       cacheRead: response.usage.cache_read_input_tokens ?? 0,
       cacheWrite: response.usage.cache_creation_input_tokens ?? 0,
     };
-    const cost = estimateCost(CHAT_MODEL, usage);
+    const cost = estimateCost(REASONING_MODEL, usage);
     recordSpend(req.headers, cost);
     return Response.json({ ...out, usage: { ...usage, cost } });
   } catch (err) {

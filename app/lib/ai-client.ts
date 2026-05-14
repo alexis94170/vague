@@ -3,6 +3,12 @@
 import { Priority, Project, Task } from "./types";
 import { todayISO, diffDays } from "./dates";
 import { recordAiCost } from "./ai-cost-tracker";
+import { loadProfile, profileToSystemBlock } from "./user-profile";
+
+function currentProfile(): string | undefined {
+  const p = loadProfile();
+  return profileToSystemBlock(p) ?? undefined;
+}
 
 export type ClassifyResult = {
   priority: Priority;
@@ -64,7 +70,7 @@ export async function aiBreakdown(opts: {
   const res = await fetch("/api/ai/breakdown", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(opts),
+    body: JSON.stringify({ ...opts, profile: currentProfile() }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: "Erreur inconnue" }));
@@ -132,6 +138,7 @@ export async function aiPlan(
       events: opts?.events,
       freeSlots: opts?.freeSlots,
       workWindow: opts?.workWindow,
+      profile: currentProfile(),
     }),
   });
   if (!res.ok) {
@@ -187,7 +194,7 @@ export async function aiSuggest(
   const res = await fetch("/api/ai/suggest", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ tasks: candidates, today: todayISO(), weekAgenda }),
+    body: JSON.stringify({ tasks: candidates, today: todayISO(), weekAgenda, profile: currentProfile() }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: "Erreur" }));
@@ -246,6 +253,7 @@ export async function aiChat(
       events: ctx?.events,
       freeSlotsToday: ctx?.freeSlotsToday,
       hasGoogleConnected: ctx?.hasGoogleConnected,
+      profile: currentProfile(),
     }),
     signal,
   });

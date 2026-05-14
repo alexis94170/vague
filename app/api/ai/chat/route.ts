@@ -40,10 +40,10 @@ type ChatInput = {
   tasks: TaskBrief[];
   projects: ProjectBrief[];
   today: string;
-  // Optional calendar context
   events?: EventBrief[];
   freeSlotsToday?: FreeSlotBrief[];
   hasGoogleConnected?: boolean;
+  profile?: string;
 };
 
 // ============= TOOLS (Claude can invoke these) =============
@@ -258,8 +258,17 @@ export async function POST(req: Request) {
     .map((s) => `- ${s.start} → ${s.end} (${s.minutes} min libres)`)
     .join("\n");
 
-  const systemBlocks = [
-    {
+  const systemBlocks: Array<{ type: "text"; text: string; cache_control?: { type: "ephemeral" } }> = [];
+
+  if (body.profile && body.profile.trim()) {
+    systemBlocks.push({
+      type: "text",
+      text: body.profile,
+      cache_control: { type: "ephemeral" },
+    });
+  }
+
+  systemBlocks.push({
       type: "text" as const,
       text: `Tu es Vague, un assistant de productivité expert qui agit sur les tâches ET l'agenda de l'utilisateur via tools.
 
@@ -289,10 +298,16 @@ ROUND-TRIPS :
 
 LIMITES :
 - N'invente pas d'IDs. Utilise uniquement ceux fournis ci-dessous.
-- Si l'utilisateur n'a pas connecté Google, dis-le quand il demande des actions agenda.`,
+- Si l'utilisateur n'a pas connecté Google, dis-le quand il demande des actions agenda.
+
+PROFIL UTILISATEUR :
+- Si un profil est fourni ci-dessus, utilise-le pour personnaliser TOUTES tes réponses.
+- Mentionne ses lieux/projets/personnes par leurs noms réels.
+- Respecte ses préférences et habitudes.`,
       cache_control: { type: "ephemeral" as const },
-    },
-    {
+    });
+
+  systemBlocks.push({
       type: "text" as const,
       text: `Date : ${body.today}
 
@@ -310,8 +325,7 @@ ${eventLines || "(aucun)"}
 Créneaux libres aujourd'hui (8h-19h, hors events) :
 ${slotLines || "(agenda plein ou aucun créneau ≥15min)"}` : "Google Calendar : NON connecté. Les tools auto_schedule et block_calendar ne fonctionneront pas."}`,
       cache_control: { type: "ephemeral" as const },
-    },
-  ];
+    });
 
   try {
     // Non-streaming this time because tool calls need the full response.
