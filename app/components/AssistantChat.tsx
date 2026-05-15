@@ -11,6 +11,7 @@ import { haptic } from "../lib/haptics";
 import { Priority, Subtask, Task } from "../lib/types";
 import { newId } from "../lib/storage";
 import Icon from "./Icon";
+import MarkdownPreview from "./MarkdownPreview";
 import VoiceButton from "./VoiceButton";
 
 type Msg = {
@@ -440,15 +441,15 @@ export default function AssistantChat({ open, onClose }: Props) {
                   <div className={`max-w-[85%] flex-col gap-1 ${m.role === "user" ? "items-end" : "items-start"}`}>
                     {m.content && (
                       <div className={`rounded-2xl px-4 py-2.5 text-[14px] leading-relaxed ${
-                        m.role === "user" ? "bg-[var(--accent)] text-white" : "bg-[var(--bg)] text-[var(--text)]"
+                        m.role === "user" ? "bg-[var(--accent)] text-[var(--accent-fg)]" : "bg-[var(--bg)] text-[var(--text)]"
                       }`}>
-                        {m.content || (loading && i === messages.length - 1 ? (
-                          <span className="inline-flex items-center gap-1">
-                            <span className="h-2 w-2 animate-pulse rounded-full bg-current opacity-50" />
-                            <span className="h-2 w-2 animate-pulse rounded-full bg-current opacity-50" style={{ animationDelay: "150ms" }} />
-                            <span className="h-2 w-2 animate-pulse rounded-full bg-current opacity-50" style={{ animationDelay: "300ms" }} />
-                          </span>
-                        ) : "")}
+                        {m.role === "user" ? (
+                          // User: plain text, preserve newlines
+                          <div className="whitespace-pre-wrap">{m.content}</div>
+                        ) : (
+                          // Assistant: render Markdown
+                          <MarkdownPreview text={m.content} />
+                        )}
                       </div>
                     )}
                     {!m.content && loading && i === messages.length - 1 && (!m.actions || m.actions.length === 0) && (
